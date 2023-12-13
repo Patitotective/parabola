@@ -1,46 +1,24 @@
 import std/[re, os]
 
-import jester
+import prologue, prologue/middlewares/[staticfile, utils]
 
 from config import nil
 
-var
-  karaxHtml: string
+const karaxHtml = readFile("public/karax.html") %
+  {
+    "title": config.title,
+    # "timestamp": encodeUrl(CompileDate & CompileTime),
+    # "ga": config.ga
+  }.newStringTable()
 
-proc initialize() =
-  # randomize()
+proc home(ctx: Context) {.async.} =
+  # resp ctx.
+  resp htmlResponse karaxHtml
 
-  # config = loadConfig()
-  # if len(config.recaptchaSecretKey) > 0 and len(config.recaptchaSiteKey) > 0:
-  #   captcha = initReCaptcha(config.recaptchaSecretKey, config.recaptchaSiteKey)
-  # else:
-  #   doAssert config.isDev, "Recaptcha required for production!"
-  #   warn("No recaptcha secret key specified.")
-
-  # mailer = newMailer(config)
-
-  # db = open(connection=config.dbPath, user="", password="",
-  #             database="nimforum")
-  # isFTSAvailable = db.getAllRows(sql("SELECT name FROM sqlite_master WHERE " &
-  #     "type='table' AND name='post_fts'")).len == 1
-
-  # buildCSS(config)
-
-  # Read karax.html and set its properties.
-  karaxHtml = readFile("public/karax.html") %
-    {
-      "title": config.title,
-      # "timestamp": encodeUrl(CompileDate & CompileTime),
-      # "ga": config.ga
-    }.newStringTable()
-
-initialize()
-
-routes:
-  get re"/(.*)":
-    # Ignore requests that have a dot, like "not-existing-file.json"
-    cond request.matches[0].splitFile.ext == ""
-
-    {.cast(gcsafe).}:
-      resp karaxHtml
+var app = newApp(
+  settings = newSettings(port = Port config.port, appName = config.title, debug = true),
+  middlewares = @[staticFileMiddleware("public"), debugRequestMiddleware(), debugResponseMiddleware()],
+)
+app.get("/", home)
+app.run()
 
