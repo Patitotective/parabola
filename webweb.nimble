@@ -15,6 +15,7 @@ requires "nim >= 2.0.0"
 requires "karax >= 1.2.2"
 # requires "jester >= 0.4.3"
 requires "prologue >= 0.6.4"
+requires "norm >= 2.8.1"
 
 task frontend, "Compiles the frontend to JavaScript":
   exec "nim js --outdir:public/js src/frontend"
