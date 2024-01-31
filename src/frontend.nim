@@ -35,7 +35,6 @@ proc renderHome(params: Params): VNode =
 
 # proc renderSimulation(params: Params): VNode = 
 #   buildHtml(tdiv):
-    
 
 const simulations = [
   (load: parabola.load, render: parabola.render), 

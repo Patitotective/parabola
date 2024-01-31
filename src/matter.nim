@@ -10,6 +10,9 @@ var
   Bodies* = Matter.Bodies
   Events* = Matter.Events
   Composite* = Matter.Composite
+  MouseConstraint* = Matter.MouseConstraint
+  Mouse* = Matter.Mouse
+  Constraint* = Matter.Constraint
 
 proc createEngine*(options: JsObject = nil): JsObject {.importjs: "Matter.Engine.create(#)".}
 proc createRender*(options: JsObject): JsObject {.importjs: "Matter.Render.create(#)".}

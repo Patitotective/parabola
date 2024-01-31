@@ -5,16 +5,21 @@ import ../../matter, ../utils, utils
 
 const deltaTime = 16.666
 
-var engine*, mrender*, bullet, ground*, runner*: JsObject
-var trail = newSeq[JsObject]()
+var
+  engine*, mrender*, bullet, ground*, runner*: JsObject
+  constraint*, mconstraint*, mouse*: JsObject
+  canvas*: Element
+  trail = newSeq[JsObject]()
+  mConstraintDragEnded*: bool
 
 proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: string) = 
   engine = Engine.create()
+  canvas = getElementById("canvas")
   mrender = Render.create(JsObject{
-    canvas: getElementById("canvas"), 
+    canvas: canvas, 
     engine: engine,
     options: JsObject{
-      width: 500,
+      width: 700,
       height: 500,
       showAngleIndicator: true,
       background: "rgb(20, 21, 31)",
@@ -28,16 +33,38 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
   bullet = Bodies.circle(400, 300, 25, JsObject{isStatic: false})
   Body.setAngle(bullet, degToRad(180d))
 
-  Composite.add(engine.world, toJs [bullet, 
+  constraint = Constraint.create(JsObject{pointA: JsObject{x: 400, y: 300}, bodyB: bullet, length: 30, stiffness: 0.1})
+
+  mouse = Mouse.create(canvas)
+  mconstraint = MouseConstraint.create(engine, JsObject{mouse: mouse})
+
+  Composite.add(engine.world, toJs [bullet, constraint, mconstraint, 
     # Walls
-    Bodies.rectangle(250, 10, 500, 20, JsObject{isStatic: true}),
-    Bodies.rectangle(495, 250, 20, 500, JsObject{isStatic: true}),
-    Bodies.rectangle(250, 495, 500, 20, JsObject{isStatic: true}),
+    Bodies.rectangle(350, 10, 700, 20, JsObject{isStatic: true}),
+    Bodies.rectangle(690, 250, 20, 500, JsObject{isStatic: true}),
+    Bodies.rectangle(350, 495, 700, 20, JsObject{isStatic: true}),
     Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}),
     # Thingy
-    Bodies.rectangle(400, 350, 20, 80, JsObject{isStatic: true})
+    Bodies.rectangle(400, 350, 20, 80, JsObject{isStatic: false})
 
   ])
+
+  Events.on(mconstraint, "enddrag", proc(event: JsObject) = 
+    console.log event
+    mConstraintDragEnded = true
+    # discard setTimeOut(proc() = Composite.remove(engine.world, constraint), 10)
+  )
+
+  Events.on(engine, "afterUpdate", proc(event: JsObject) = 
+    let d = distance(constraint.pointA, bullet.position)
+    if mConstraintDragEnded:
+      print d
+    if mConstraintDragEnded and d.x.to(float64) < 30d and d.y.to(float64) < 30d:
+      # print distance(constraint.pointA, bullet.position)
+      # jsonPrint constraint, mconstraint
+      Composite.remove(engine.world, constraint)
+      mConstraintDragEnded = false
+  )
 
   Events.on(mrender, "afterRender", proc() =
     Render.startViewTransform(mrender)
@@ -54,16 +81,23 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
 proc calcTrajectory() = 
   var stop = false
 
+
   let bodies = cloneAllBodies(engine.world)
 
-  Events.on(engine, "collisionStart", 
-    proc (event: JsObject) = 
-      if event.pairs[0].bodyA.id == bullet.id:
-        stop = true
+  if not mconstraint.body.isNil:
+    mconstraint.body = nil
+    mconstraint.constraint.bodyB = mconstraint.body
+    mconstraint.constraint.pointB = nil
+
+    # Composite.remove(engine.world, constraint)
+
+  Events.on(engine, "collisionStart", proc (event: JsObject) = 
+    if event.pairs[0].bodyA.id == bullet.id:
+      stop = true
   )
 
   let force = bullet.circleRadius.to(float64) / 250
-  Body.applyForce(bullet, bullet.position, JsObject{x: cos(bullet.angle.to(float64)) * force, y: sin(bullet.angle.to(float64)) * force})
+  # Body.applyForce(bullet, bullet.position, JsObject{x: cos(bullet.angle.to(float64)) * force, y: sin(bullet.angle.to(float64)) * force})
 
   trail.setLen(0)
   for i in 1..1000:
@@ -87,6 +121,9 @@ proc calcTrajectory() =
     Body.setVelocity(b, oldb.velocity)
     Body.setAngularVelocity(b, oldb.angularVelocity)
     Body.setAngle(b, oldb.angle)
+
+  # if not mconstraint.body.isNil:
+  Composite.add(engine.world, constraint)
 
 proc render*(params: Params): VNode =
   result = buildHtml(tdiv):
@@ -125,6 +162,16 @@ proc render*(params: Params): VNode =
         let force = bullet.circleRadius.to(float64) / 250
         Body.applyForce(bullet, bullet.position, JsObject{x: cos(bullet.angle.to(float64)) * force, y: sin(bullet.angle.to(float64)) * force})
 
-    canvas(id = "canvas", style = "width: 500px; height: 500px; background: rgb(20, 21, 31)".toCss):
+    canvas(id = "canvas", style = "width: 700px; height: 500px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
+
+document.addEventListener("keyup", proc (event: Event) = 
+  let event = KeyboardEvent(event)
+  case $event.key
+  of "t":
+    calcTrajectory()
+  of "p":
+    jsonPrint mconstraint, constraint, bullet
+)
+
 
