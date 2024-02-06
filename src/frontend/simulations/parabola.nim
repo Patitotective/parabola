@@ -9,7 +9,7 @@ var
   engine*, mrender*, bullet, ground*, runner*: JsObject
   constraint*, mconstraint*, mouse*: JsObject
   canvas*: Element
-  trail = newSeq[JsObject]()
+  trail = newSeq[JsVector]()
   mConstraintDragEnded*: bool
 
 proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: string) = 
@@ -72,58 +72,65 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
 
     for i in trail:
       mrender.context.fillStyle = cstring"orange"
-      mrender.context.fillRect(i.x, i.y, 2, 2)
+      mrender.context.fillRect(JsObject(i).x, JsObject(i).y, 2, 2)
 
     mrender.context.globalAlpha = 1
     Render.endViewTransform(mrender)
   )
 
 proc calcTrajectory() = 
-  var stop = false
+  for i in 1..100:
+    let g = JsVector JsObject{x: engine.gravity.x * engine.gravity.scale, y: engine.gravity.y * engine.gravity.scale}
+    let t = deltaTime * float64 i
+    trail.add JsVector(bullet.position) + JsVector(bullet.constraintImpulse) * t + (g / 2) * pow(t, 2)
 
 
-  let bodies = cloneAllBodies(engine.world)
+    # pos(t) = startPos + startVel * t + gravitionalForce * (1/2) * t ** 2
+  # var stop = false
 
-  if not mconstraint.body.isNil:
-    mconstraint.body = nil
-    mconstraint.constraint.bodyB = mconstraint.body
-    mconstraint.constraint.pointB = nil
 
-    # Composite.remove(engine.world, constraint)
-
-  Events.on(engine, "collisionStart", proc (event: JsObject) = 
-    if event.pairs[0].bodyA.id == bullet.id:
-      stop = true
-  )
-
-  let force = bullet.circleRadius.to(float64) / 250
-  # Body.applyForce(bullet, bullet.position, JsObject{x: cos(bullet.angle.to(float64)) * force, y: sin(bullet.angle.to(float64)) * force})
-
-  trail.setLen(0)
-  for i in 1..1000:
-    trail.add JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
-
-    if stop:
-      break
-
-    Engine.update(engine)
-
-  Events.off(engine, "collitionStart")
-
-  for (e, b) in enumerate Composite.allBodies(engine.world):
-    assert b.id == bodies[e].id
-    let oldb = bodies[e]
-
-    b.anglePrev = oldb.anglePrev
-    b.force = oldb.force
-    b.torque = oldb.torque
-    Body.setPosition(b, oldb.position)
-    Body.setVelocity(b, oldb.velocity)
-    Body.setAngularVelocity(b, oldb.angularVelocity)
-    Body.setAngle(b, oldb.angle)
+  # let bodies = cloneAllBodies(engine.world)
 
   # if not mconstraint.body.isNil:
-  Composite.add(engine.world, constraint)
+  #   mconstraint.body = nil
+  #   mconstraint.constraint.bodyB = mconstraint.body
+  #   mconstraint.constraint.pointB = nil
+
+  #   # Composite.remove(engine.world, constraint)
+
+  # Events.on(engine, "collisionStart", proc (event: JsObject) = 
+  #   if event.pairs[0].bodyA.id == bullet.id:
+  #     stop = true
+  # )
+
+  # let force = bullet.circleRadius.to(float64) / 250
+  # # Body.applyForce(bullet, bullet.position, JsObject{x: cos(bullet.angle.to(float64)) * force, y: sin(bullet.angle.to(float64)) * force})
+
+  # trail.setLen(0)
+  # for i in 1..1000:
+  #   trail.add JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
+
+  #   if stop:
+  #     break
+
+  #   Engine.update(engine)
+
+  # Events.off(engine, "collitionStart")
+
+  # for (e, b) in enumerate Composite.allBodies(engine.world):
+  #   assert b.id == bodies[e].id
+  #   let oldb = bodies[e]
+
+  #   b.anglePrev = oldb.anglePrev
+  #   b.force = oldb.force
+  #   b.torque = oldb.torque
+  #   Body.setPosition(b, oldb.position)
+  #   Body.setVelocity(b, oldb.velocity)
+  #   Body.setAngularVelocity(b, oldb.angularVelocity)
+  #   Body.setAngle(b, oldb.angle)
+
+  # # if not mconstraint.body.isNil:
+  # Composite.add(engine.world, constraint)
 
 proc render*(params: Params): VNode =
   result = buildHtml(tdiv):
@@ -170,6 +177,8 @@ document.addEventListener("keyup", proc (event: Event) =
   case $event.key
   of "t":
     calcTrajectory()
+  of "r":
+    Composite.add(engine.world, constraint)
   of "p":
     jsonPrint mconstraint, constraint, bullet
 )
