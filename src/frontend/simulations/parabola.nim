@@ -1,4 +1,4 @@
-import std/[math, jsffi, dom, jsconsole, enumerate]
+import std/[math, jsffi, dom, jsconsole, enumerate, with]
 import karax/[karax, karaxdsl, vdom, vstyles]
 
 import ../../matter, ../utils, utils
@@ -58,7 +58,7 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
   Events.on(engine, "afterUpdate", proc(event: JsObject) = 
     let d = distance(constraint.pointA, bullet.position)
     if mConstraintDragEnded:
-      print d
+      # print d
     if mConstraintDragEnded and d.x.to(float64) < 30d and d.y.to(float64) < 30d:
       # print distance(constraint.pointA, bullet.position)
       # jsonPrint constraint, mconstraint
@@ -79,16 +79,50 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
   )
 
 proc calcTrajectory() = 
+  let bulletClone = structuredClone(bullet)
+  let constraintClone = structuredClone(constraint)
+  let delta = deltaTime * engine.timing.timeScale.to(float64)
+
   for i in 1..100:
-    let g = JsVector JsObject{x: engine.gravity.x * engine.gravity.scale, y: engine.gravity.y * engine.gravity.scale}
-    let t = deltaTime * float64 i
-    trail.add JsVector(bullet.position) + JsVector(bullet.constraintImpulse) * t + (g / 2) * pow(t, 2)
+    trail.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
+    `.()`(Engine, "_bodiesApplyGravity", toJs [bullet], engine.gravity)
+    `.()`(Engine, "_bodiesUpdate", toJs [bullet], delta)
+    Constraint.solveAll(toJs [constraint], delta)
+    `.()`(Engine, "_bodiesUpdateVelocities", toJs [bullet])
+    `.()`(Engine, "_bodiesClearForces", toJs [bullet])
 
+  with bullet:
+    angle = bulletClone.angle
+    position = bulletClone.position
+    force = bulletClone.force
+    torque = bulletClone.torque
+    positionImpulse = bulletClone.positionImpulse
+    constraintImpulse = bulletClone.constraintImpulse
+    totalContacts = bulletClone.totalContacts
+    speed = bulletClone.speed
+    angularSpeed = bulletClone.angularSpeed
+    velocity = bulletClone.velocity
+    angularVelocity = bulletClone.angularVelocity
+    # motion = bulletClone.motion
+    # position = bulletClone.position
+    # position = bulletClone.position
+    # position = bulletClone.position
+    # position = bulletClone.position
+    # position = bulletClone.position
+    # position = bulletClone.position
 
-    # pos(t) = startPos + startVel * t + gravitionalForce * (1/2) * t ** 2
+  # bullet.anglePrev = bulletClone.anglePrev
+  # bullet.force = bulletClone.force
+  # bullet.torque = bulletClone.torque
+  # Body.setPosition(bullet, bulletClone.position)
+  # Body.setVelocity(bullet, bulletClone.velocity)
+  # Body.setAngularVelocity(bullet, bulletClone.angularVelocity)
+  # Body.setAngle(bullet, bulletClone.angle)
+
+  constraint.angleA = constraintClone.angleA
+  constraint.angleB = constraintClone.angleB
+
   # var stop = false
-
-
   # let bodies = cloneAllBodies(engine.world)
 
   # if not mconstraint.body.isNil:
