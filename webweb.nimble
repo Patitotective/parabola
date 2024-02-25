@@ -16,6 +16,7 @@ requires "karax >= 1.2.2"
 # requires "jester >= 0.4.3"
 requires "prologue >= 0.6.4"
 requires "norm >= 2.8.1"
+# requires "https://github.com/planetis-m/jscanvas >= 0.1.0"
 
 task frontend, "Compiles the frontend to JavaScript":
   exec "nim js --outdir:public/js src/frontend"
