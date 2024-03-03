@@ -1,18 +1,23 @@
 import std/[jsffi]
 
 var
-  Matter {.importjs, nodecl.}: JsObject
-  Body* = Matter.Body
-  Vector* = Matter.Vector
-  Engine* = Matter.Engine
-  Render* = Matter.Render
-  Runner* = Matter.Runner
-  Bodies* = Matter.Bodies
-  Events* = Matter.Events
-  Composite* = Matter.Composite
-  MouseConstraint* = Matter.MouseConstraint
-  Mouse* = Matter.Mouse
-  Constraint* = Matter.Constraint
+  Matter* {.importjs, nodecl.}: JsObject
+  Body*, Vector*, Engine*, Render*, Runner*, Bodies*, Events*, Composite*, MouseConstraint*, Mouse*, Constraint*: JsObject
+
+# This function is used to load Matter's aliases
+# since when using plugins you should reload aliases
+proc loadAliases*() = 
+  Body = Matter.Body
+  Vector = Matter.Vector
+  Engine = Matter.Engine
+  Render = Matter.Render
+  Runner = Matter.Runner
+  Bodies = Matter.Bodies
+  Events = Matter.Events
+  Composite = Matter.Composite
+  MouseConstraint = Matter.MouseConstraint
+  Mouse = Matter.Mouse
+  Constraint = Matter.Constraint
 
 type
   JsVector* = distinct JsObject

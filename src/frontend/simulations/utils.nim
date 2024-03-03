@@ -2,11 +2,15 @@ import std/jsffi
 
 import ../../matter
 
+var infinity* {.importjs: "Infinity", nodecl.}: JsObject
+
 proc jsFloatToInt*(o: JsObject): JsObject {.importjs: "~~#".}
 
 proc structuredClone*(o: JsObject): JsObject {.importjs: "structuredClone(#)".}
 
 proc jstring*(s: string): JsObject = toJs(cstring s)
+
+proc print*(o: JsObject) {.importjs: "console.log(structuredClone(#))".}
 
 proc print*(o: varargs[JsObject, structuredClone]) {.importjs: "console.log(@)".}
 
