@@ -107,7 +107,6 @@ proc reload() =
 
 proc sendBulletFlying() = 
   let hypotenuse = bullet.circleRadius.to(float64) * 0.48 # force magnitude
-  echo hypotenuse
   let x = cos(bullet.angle.to(float64)) * hypotenuse
   let y = sin(bullet.angle.to(float64)) * hypotenuse
 
