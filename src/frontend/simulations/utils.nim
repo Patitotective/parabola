@@ -2,7 +2,9 @@ import std/jsffi
 
 import ../../matter
 
-var infinity* {.importjs: "Infinity", nodecl.}: JsObject
+var
+  infinity* {.importjs: "Infinity", nodecl.}: JsObject
+  MathJax* {.importjs: "MathJax", nodecl.}: JsObject
 
 proc jsFloatToInt*(o: JsObject): JsObject {.importjs: "~~#".}
 

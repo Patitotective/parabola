@@ -1,5 +1,5 @@
 import std/[dom, json, asyncjs, jsffi, math, jsconsole, enumerate, sugar, strformat, strutils, tables]
-import karax/[karax, kajax, karaxdsl, vdom, vstyles]
+import karax/[karax, kajax, karaxdsl, vdom, vstyles, i18n, jdict, languages]
 
 import matter
 import frontend/[utils, user, patterns]
@@ -28,6 +28,8 @@ proc newState(): State =
   State(location: window.location.deepCopy(), prevTitle: document.title, simulationIndex: -1)
 
 var state = newState()
+
+# addTranslation(esCo, "s/0/")
 
 proc renderHome(params: Params): VNode =
   buildHtml(tdiv):

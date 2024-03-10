@@ -3,12 +3,20 @@ import karax/[karax, karaxdsl, vdom, vstyles]
 
 import ../../matter, ../utils, utils
 
+type
+  Excercise = object
+    pos: tuple[x, y: int]
+    angle: float
+    speed: int
+
 const
   deltaTime = 16.666
   canvasWidth = 700
   canvasHeight = 500
+  excercises = [Excercise(pos: (10, 0), angle: 120, speed: 10)]
 
-let wrapObject = JsObject{min: JsObject{x: 0, y: 0}, max: JsObject{x: canvasWidth, y: canvasHeight}} # To avoid boilerplate
+let
+  wrapObject = JsObject{min: JsObject{x: 0, y: 0}, max: JsObject{x: canvasWidth, y: canvasHeight}} # To avoid boilerplate
 
 var
   engine*, mrender*, bullet, floor, ground*, runner*: JsObject
@@ -18,6 +26,10 @@ var
   mConstraintDragEnded*: bool
 
 proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: string) = 
+  # MathJax
+  MathJax.typesetPromise()
+
+  # Matter
   Matter.use("matter-wrap")
   loadAliases()
 
@@ -60,30 +72,6 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
     Bodies.rectangle(400, 350, 20, 80, JsObject{isStatic: false, plugin: JsObject{wrap: wrapObject}})
 
   ])
-
-  # Events.on(mconstraint, "enddrag", proc(event: JsObject) = 
-  #   console.log event
-  #   mConstraintDragEnded = true
-  #   # discard setTimeOut(proc() = Composite.remove(engine.world, constraint), 10)
-  # )
-
-  # Events.on(engine, "afterUpdate", proc(event: JsObject) = 
-  #   let d = distance(constraint.pointA, bullet.position)
-  #   # if mConstraintDragEnded:
-  #     # print d
-  #   if mConstraintDragEnded and d.x.to(float64) < 30d and d.y.to(float64) < 30d:
-  #     # print distance(constraint.pointA, bullet.position)
-  #     # jsonPrint constraint, mconstraint
-  #     Composite.remove(engine.world, constraint)
-  #     mConstraintDragEnded = false
-  # )
-
-  # Seems like it's not needed anymore, since inertia = infinity
-  # Events.on(engine, "collisionStart", proc (event: JsObject) = 
-  #   if event.pairs[0].bodyA.id == bullet.id and event.pairs[0].bodyB.id == floor.id:
-  #     Body.setVelocity(bullet, JsObject{x: 0, y: 0})
-  #     Body.setAngularVelocity(bullet, 0) 
-  # )
 
   Events.on(mrender, "afterRender", proc() =
     Render.startViewTransform(mrender)
@@ -146,21 +134,6 @@ proc calcTrajectory() =
     assert b.id == bodies[e].id
     let oldb = bodies[e]
 
-    # with b:
-    #   angle = oldb.angle
-    #   position = oldb.position
-    #   force = oldb.force
-    #   torque = oldb.torque
-    #   positionImpulse = oldb.positionImpulse
-    #   constraintImpulse = oldb.constraintImpulse
-    #   totalContacts = oldb.totalContacts
-    #   speed = oldb.speed
-    #   angularSpeed = oldb.angularSpeed
-    #   velocity = oldb.velocity
-    #   angularVelocity = oldb.angularVelocity
-
-    # print JsObject{old: oldb.velocity, cur: b.velocity}
-
     b.anglePrev = oldb.anglePrev
     b.force = oldb.force
     b.torque = oldb.torque
@@ -169,10 +142,13 @@ proc calcTrajectory() =
     Body.setAngularVelocity(b, oldb.angularVelocity)
     Body.setAngle(b, oldb.angle)
 
-    # print JsObject{aft: b.velocity}
-  
-proc render*(params: Params): VNode =
-  result = buildHtml(tdiv):
+proc renderTextDiv*(): VNode = 
+  result = buildHtml tdiv(style = "float: left; width: 50%;".toCss):
+    p(text r"\(a = \frac{v_f - v_i}{\Delta t}\)", style = "font-size: 80px;".toCss)
+    # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
+
+proc renderSimDiv*(): VNode = 
+  result = buildHtml tdiv(style = "float: right; width: 50%;".toCss):
     button():
       text "Start the simulation"
       proc onclick()  =
@@ -204,6 +180,12 @@ proc render*(params: Params): VNode =
       
     canvas(id = "canvas", style = fmt"width: {canvasWidth}px; height: {canvasHeight}px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
+
+  
+proc render*(params: Params): VNode =
+  result = buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):
+    renderTextDiv()
+    renderSimDiv()
 
 document.addEventListener("keyup", proc (event: Event) = 
   let event = KeyboardEvent(event)
