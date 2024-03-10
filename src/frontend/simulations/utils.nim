@@ -5,6 +5,7 @@ import ../../matter
 var
   infinity* {.importjs: "Infinity", nodecl.}: JsObject
   MathJax* {.importjs: "MathJax", nodecl.}: JsObject
+  undefined* {.importjs: "undefined".}: JsObject
 
 proc jsFloatToInt*(o: JsObject): JsObject {.importjs: "~~#".}
 

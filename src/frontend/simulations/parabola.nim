@@ -4,7 +4,7 @@ import karax/[karax, karaxdsl, vdom, vstyles]
 import ../../matter, ../utils, utils
 
 type
-  Excercise = object
+  Exercise = object
     pos: tuple[x, y: int]
     angle: float
     speed: int
@@ -13,10 +13,10 @@ const
   deltaTime = 16.666
   canvasWidth = 700
   canvasHeight = 500
-  excercises = [Excercise(pos: (10, 0), angle: 120, speed: 10)]
+  floorHeight = 20
 
 let
-  wrapObject = JsObject{min: JsObject{x: 0, y: 0}, max: JsObject{x: canvasWidth, y: canvasHeight}} # To avoid boilerplate
+  wrapObject = JsObject{min: JsObject{x: 0, y: undefined}, max: JsObject{x: canvasWidth, y: undefined}} # To avoid boilerplate
 
 var
   engine*, mrender*, bullet, floor, ground*, runner*: JsObject
@@ -24,6 +24,7 @@ var
   canvas*: Element
   trail = newSeq[JsVector]()
   mConstraintDragEnded*: bool
+  exercises = @[Exercise(pos: (50, 0), angle: 120, speed: 10)]
 
 proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: string) = 
   # MathJax
@@ -53,18 +54,18 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
   bullet = Bodies.circle(400, 300, 25, JsObject{isStatic: false, frictionAir: 0, friction: 1, mass: 2, plugin: JsObject{wrap: wrapObject}})
 
   Body.setInertia(bullet, infinity)
-  Body.setAngle(bullet, degToRad(180d))
+  # Body.setAngle(bullet, degToRad(180d))
 
   # constraint = Constraint.create(JsObject{pointA: JsObject{x: 400, y: 300}, bodyB: bullet, length: 30, stiffness: 0.1})
 
-  floor = Bodies.rectangle(350, 495, 800, 20, JsObject{isStatic: true})
+  floor = Bodies.rectangle(350, 495, 1200, floorHeight, JsObject{isStatic: true})
 
   mouse = Mouse.create(canvas)
   mconstraint = MouseConstraint.create(engine, JsObject{mouse: mouse})
 
   Composite.add(engine.world, toJs [bullet, mconstraint, 
     # Walls
-    Bodies.rectangle(350, 10, 800, 20, JsObject{isStatic: true}), # up
+    Bodies.rectangle(350, -200, 1000, 20, JsObject{isStatic: true}), # up
     # Bodies.rectangle(690, 250, 20, 500, JsObject{isStatic: true}), # right
     floor, # down
     # Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
@@ -181,7 +182,18 @@ proc renderSimDiv*(): VNode =
     canvas(id = "canvas", style = fmt"width: {canvasWidth}px; height: {canvasHeight}px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
 
-  
+    tdiv(id = "exercises", style = "height: 200px; overflow-y: auto;".toCss):
+      for e, exercise in exercises:
+        button():
+          text &"#{e+1} {exercise}"
+
+          proc onclick() = 
+            # Since matter measures y since the top of the screen, here we convert it so that the 0 starts at the floor
+            let y = -(exercise.pos.y) + (floor.position.y.to(int) - (floorHeight div 2) - bullet.circleRadius.to(int))
+            echo y
+            Body.setPosition(bullet, JsObject{x: exercise.pos.x, y: y})
+            Body.setAngle(bullet, degToRad(exercise.angle))
+
 proc render*(params: Params): VNode =
   result = buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):
     renderTextDiv()
@@ -198,7 +210,7 @@ document.addEventListener("keyup", proc (event: Event) =
   of "ArrowLeft":
     rotateBullet(false)
     calcTrajectory()
-  of "Enter":
+  of "ArrowUp":
     sendBulletFlying()
   of "Backspace":
     reload()
