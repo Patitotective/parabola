@@ -9,6 +9,12 @@ type
     angle: float
     speed: int
 
+  ExerciseStatus = enum
+    esNone # Not in any exercise
+    esBegin # Not launched yet
+    esMiddle # In the air
+    esEnd # Touched something
+
 const
   deltaTime = 16.666
   canvasWidth = 700
@@ -24,7 +30,9 @@ var
   canvas*: Element
   trail = newSeq[JsVector]()
   mConstraintDragEnded*: bool
-  exercises = @[Exercise(pos: (50, 0), angle: 120, speed: 10)]
+  exercises = @[Exercise(pos: (50, 0), angle: 300, speed: 10)]
+  exerciseStatus = esNone
+  finalSpeed: int # Final speed of an exercise
 
 proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: string) = 
   # MathJax
@@ -53,7 +61,7 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
   
   bullet = Bodies.circle(400, 300, 25, JsObject{isStatic: false, frictionAir: 0, friction: 1, mass: 2, plugin: JsObject{wrap: wrapObject}})
 
-  Body.setInertia(bullet, infinity)
+  Body.setInertia(bullet, Infinity)
   # Body.setAngle(bullet, degToRad(180d))
 
   # constraint = Constraint.create(JsObject{pointA: JsObject{x: 400, y: 300}, bodyB: bullet, length: 30, stiffness: 0.1})
@@ -73,6 +81,11 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
     Bodies.rectangle(400, 350, 20, 80, JsObject{isStatic: false, plugin: JsObject{wrap: wrapObject}})
 
   ])
+
+  Events.on(engine, "afterUpdate", proc() = 
+    # So that it updates the formula values
+    if not kxi.surpressRedraws: redraw(kxi)
+  )
 
   Events.on(mrender, "afterRender", proc() =
     Render.startViewTransform(mrender)
@@ -102,7 +115,7 @@ proc sendBulletFlying() =
   Body.setVelocity(bullet, JsObject{x: x, y: y})
 
 proc rotateBullet(clockwise = true) = 
-  var rad = degToRad((360 / bullet.vertices.length.to(float64))*2)
+  var rad = degToRad(30d)#(360 / bullet.vertices.length.to(float64))*2)
   if not clockwise:
     rad = -rad
 
@@ -110,42 +123,82 @@ proc rotateBullet(clockwise = true) =
 
 proc calcTrajectory() = 
   var stop = false
-  let bodies = cloneAllBodies(engine.world)
+  # let bodies = cloneAllBodies(engine.world)
+  let oldb = bullet.structuredClone()
+  print bullet.jsonStringify()
+
+  var formerStaticBodies: seq[JsObject]
+  for body in Composite.allBodies(engine.world):
+    if body.id != bullet.id:
+      if body.isStatic.to(bool) == true:
+        formerStaticBodies.add body.id
+      else:
+        Body.setStatic(body, true)
 
   proc onCollision(event: JsObject) = 
     if event.pairs[0].bodyA.id == bullet.id:
       stop = true
 
-  Events.on(engine, "collisionStart", onCollision)
-
   sendBulletFlying()
+
+  Events.on(engine, "collisionStart", onCollision)
 
   trail.setLen(0)
   for i in 1..1000:
     trail.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
 
     if stop:
+      exerciseStatus = esEnd
+      finalSpeed = int bullet.speed.to(float)
       break
 
     Engine.update(engine)
 
   Events.off(engine, "collitionStart", onCollision)
 
-  for (e, b) in enumerate Composite.allBodies(engine.world):
-    assert b.id == bodies[e].id
-    let oldb = bodies[e]
+  for b in [bullet]:#enumerate Composite.allBodies(engine.world):
+    # assert b.id == bodies[e].id
+    # let oldb = bodies[e]
+    # Object.assign(b, oldb)
 
-    b.anglePrev = oldb.anglePrev
     b.force = oldb.force
     b.torque = oldb.torque
+    b.positionImpulse = oldb.positionImpulse
+    b.constraintImpulse = oldb.constraintImpulse
+    b.positionPrev = oldb.positionPrev
+    # Body.setParts(b, oldb.parts)# b.parts = oldb.parts
+    # Body.setVertices(b, oldb.vertices)# b.vertices = oldb.vertices
+    # b.bounds = oldb.bounds
+    
     Body.setPosition(b, oldb.position)
-    Body.setVelocity(b, oldb.velocity)
-    Body.setAngularVelocity(b, oldb.angularVelocity)
     Body.setAngle(b, oldb.angle)
+    Body.setVelocity(b, oldb.velocity)
+    Body.setAngularVelocity(b, oldb.angularVelocity)    
+
+  for body in Composite.allBodies(engine.world):
+    if body.id != bullet.id and body.id notin formerStaticBodies:
+      Body.setStatic(body, false)
+
+  print bullet.jsonStringify()#Composite.allBodies(engine.world).jsonStringify()
 
 proc renderTextDiv*(): VNode = 
   result = buildHtml tdiv(style = "float: left; width: 50%;".toCss):
     p(text r"\(a = \frac{v_f - v_i}{\Delta t}\)", style = "font-size: 80px;".toCss)
+    if not bullet.isNil:
+      var a = int bullet.angle.to(float).radToDeg
+      a -= (a div 360) * 360 # Remove excess rotations
+      if a < 0: a = abs a
+      elif a > 0: a = 360 - a
+        
+      p(text &"x = {int bullet.position.x.to(float)} y = {int bullet.position.y.to(float)}")
+      p(text &"angle = {a}")
+      if exerciseStatus != esNone:
+        p(text &"Vi = {int bullet.speed.to(float)}")
+        if exerciseStatus == esEnd:
+          p(text &"Vf = {finalSpeed}")
+        else:
+          p(text &"Vf = ?")
+          
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
 proc renderSimDiv*(): VNode = 
@@ -190,9 +243,10 @@ proc renderSimDiv*(): VNode =
           proc onclick() = 
             # Since matter measures y since the top of the screen, here we convert it so that the 0 starts at the floor
             let y = -(exercise.pos.y) + (floor.position.y.to(int) - (floorHeight div 2) - bullet.circleRadius.to(int))
-            echo y
             Body.setPosition(bullet, JsObject{x: exercise.pos.x, y: y})
             Body.setAngle(bullet, degToRad(exercise.angle))
+            calcTrajectory()
+            exerciseStatus = esBegin
 
 proc render*(params: Params): VNode =
   result = buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):

@@ -3,9 +3,10 @@ import std/jsffi
 import ../../matter
 
 var
-  infinity* {.importjs: "Infinity", nodecl.}: JsObject
-  MathJax* {.importjs: "MathJax", nodecl.}: JsObject
-  undefined* {.importjs: "undefined".}: JsObject
+  Infinity* {.importjs, nodecl.}: JsObject
+  MathJax* {.importjs, nodecl.}: JsObject
+  undefined* {.importjs, nodecl.}: JsObject
+  Object* {.importjs, nodecl.}: JsObject
 
 proc jsFloatToInt*(o: JsObject): JsObject {.importjs: "~~#".}
 
@@ -13,9 +14,13 @@ proc structuredClone*(o: JsObject): JsObject {.importjs: "structuredClone(#)".}
 
 proc jstring*(s: string): JsObject = toJs(cstring s)
 
-proc print*(o: JsObject) {.importjs: "console.log(structuredClone(#))".}
+proc clonePrint*(o: JsObject) {.importjs: "console.log(structuredClone(#))".}
 
-proc print*(o: varargs[JsObject, structuredClone]) {.importjs: "console.log(@)".}
+proc clonePrint*(o: varargs[JsObject, structuredClone]) {.importjs: "console.log(@)".}
+
+proc print*(o: JsObject) {.importjs: "console.log(@)".}
+
+proc print*(o: varargs[JsObject]) {.importjs: "console.log(@)".}
 
 {.emit: """
 function getCircularReplacer() {
@@ -39,6 +44,10 @@ function getCircularReplacer() {
 """.}
 
 proc jsonClone*(o: JsObject): JsObject {.importjs: "JSON.parse(JSON.stringify(#, getCircularReplacer()))".}
+
+proc jsonStringify*(o: JsObject): JsObject {.importjs: "JSON.stringify(@, getCircularReplacer(), 2)".}
+
+proc jsonPrint*(o: JsObject) {.importjs: "console.log(JSON.parse(JSON.stringify(@, getCircularReplacer())))".}
 
 proc jsonPrint*(o: varargs[JsObject, jsonClone]) {.importjs: "console.log(@)".}
 
