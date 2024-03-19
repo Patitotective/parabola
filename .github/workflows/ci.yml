@@ -12,14 +12,17 @@ jobs:
   ubuntu:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: iffy/install-nim@v5
 
-      - name: Build
-        run: |
-          nimble install -d -y
-          nimble frontend
-          nimble build
+      - name: Install Dependencies
+        run: nimble install -d -y
+
+      - name: Frontend
+        run: nimble frontend
+
+      - name: Backend
+        run: nimble build
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
@@ -33,13 +36,14 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: iffy/install-nim@v5
 
-      - name: Build
-        run: |
-          nimble install -d -y
-          nake build
+      - name: Frontend
+        run: nimble frontend
+
+      - name: Backend
+        run: nimble build
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
