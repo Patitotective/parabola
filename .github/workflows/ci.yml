@@ -40,6 +40,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: iffy/install-nim@v5
 
+      - name: Install Dependencies
+        run: nimble install -d -y
+
       - name: Frontend
         run: nimble frontend
 
