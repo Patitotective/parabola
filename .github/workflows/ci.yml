@@ -54,6 +54,6 @@ jobs:
         with:
           name: windows
           path: |
-            app
+            app.exe
             public
           if-no-files-found: error
