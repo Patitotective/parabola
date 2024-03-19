@@ -1,0 +1,47 @@
+name: CI
+on:
+  push:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  appimage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: iffy/install-nim@v5
+
+      - name: Build
+        run: |
+          nimble install -d -y
+          nimble frontend
+          nimble build
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu
+          path: |
+            src/app
+            public
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: iffy/install-nim@v5
+
+      - name: Build
+        run: |
+          nimble install -d -y
+          nake build
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            src/app
+            public
+          if-no-files-found: error
