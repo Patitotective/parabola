@@ -30,7 +30,7 @@ jobs:
         with:
           name: ubuntu
           path: |
-            src/app
+            app
             public
           if-no-files-found: error
 
@@ -54,6 +54,6 @@ jobs:
         with:
           name: windows
           path: |
-            src/app
+            app
             public
           if-no-files-found: error
