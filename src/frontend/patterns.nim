@@ -1,3 +1,5 @@
+## This module implements the ability to match patterns in an URL, for example: "socialwebsite.com/user/{id}
+
 # Taken from https://github.com/dom96/jester/blob/ac9b8541dce64feff9b53b700cab8496c1816651/jester/patterns.nim
 # Copyright (C) 2012-2018 Dominik Picheta
 # MIT License - Look at license.txt for details.

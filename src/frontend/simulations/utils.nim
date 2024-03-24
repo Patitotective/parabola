@@ -1,6 +1,6 @@
 import std/jsffi
 
-import ../../matter
+import matter
 
 var
   Infinity* {.importjs, nodecl.}: JsObject
@@ -51,13 +51,13 @@ proc jsonPrint*(o: JsObject) {.importjs: "console.log(JSON.parse(JSON.stringify(
 
 proc jsonPrint*(o: varargs[JsObject, jsonClone]) {.importjs: "console.log(@)".}
 
-proc distance*(v1, v2: JsObject): JsObject = 
+proc distance*(v1, v2: JsObject): JsObject =
   JsObject{x: abs((v1.x - v2.x).to(float64)), y: abs((v1.y - v2.y).to(float64))}
 
-proc forceToVelocity*(force: float64, mass: float64, deltaTime = 16.666): float64 = 
+proc forceToVelocity*(force: float64, mass: float64, deltaTime = 16.666): float64 =
   let acceleration = force * mass
   acceleration * deltaTime
 
-proc cloneAllBodies*(world: JsObject): seq[JsObject] = 
+proc cloneAllBodies*(world: JsObject): seq[JsObject] =
   structuredClone(Composite.allBodies(world)).to(seq[JsObject])
 

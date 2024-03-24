@@ -1,7 +1,7 @@
 import std/[math, jsffi, dom, jsconsole, enumerate, with, strformat]
 import karax/[karax, karaxdsl, vdom, vstyles]
 
-import ../../matter, ../utils, utils
+import matter, utils
 
 type
   Exercise = object
@@ -10,10 +10,9 @@ type
     speed: int
 
   ExerciseStatus = enum
-    esNone # Not in any exercise
-    esBegin # Not launched yet
-    esMiddle # In the air
-    esEnd # Touched something
+    esStart # Not launched yet
+    esStarted # In the air
+    esEnd # Touched something and stopped
 
 const
   deltaTime = 16.666
@@ -28,24 +27,28 @@ var
   engine*, mrender*, bullet, floor, ground*, runner*: JsObject
   constraint*, mconstraint*, mouse*: JsObject
   canvas*: Element
+
   trail = newSeq[JsVector]()
-  mConstraintDragEnded*: bool
-  exercises = @[Exercise(pos: (50, 0), angle: 300, speed: 10)]
-  exerciseStatus = esNone
+  mConstraintDragEnded*: bool # True when you release the mouse constraint
+
+  exercises = @[Exercise(pos: (50, 0), angle: 300, speed: 12)]
+  currentExercise = -1
+  exerciseStatus: ExerciseStatus
   finalSpeed: int # Final speed of an exercise
 
-proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: string) = 
-  # MathJax
+## Loads the simulation
+proc load*() =
+  # Render all MathJax expressions asynchronously
   MathJax.typesetPromise()
 
-  # Matter
+  # Load wrap's plugin and load matter aliases to point to the correct values
   Matter.use("matter-wrap")
-  loadAliases()
+  loadMatterAliases()
 
-  engine = Engine.create()
   canvas = getElementById("canvas")
+  engine = Engine.create()
   mrender = Render.create(JsObject{
-    canvas: canvas, 
+    canvas: canvas,
     engine: engine,
     options: JsObject{
       width: canvasWidth,
@@ -58,8 +61,9 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
 
   runner = Runner.create(JsObject{delta: deltaTime})
   Runner.run(runner, engine)
-  
-  bullet = Bodies.circle(400, 300, 25, JsObject{isStatic: false, frictionAir: 0, friction: 1, mass: 2, plugin: JsObject{wrap: wrapObject}})
+
+  # Create and add all bodies to the world
+  bullet = Bodies.circle(500, 300, 25, JsObject{isStatic: false, frictionAir: 0, friction: 1, mass: 2, plugin: JsObject{wrap: wrapObject}})
 
   Body.setInertia(bullet, Infinity)
   # Body.setAngle(bullet, degToRad(180d))
@@ -71,7 +75,7 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
   mouse = Mouse.create(canvas)
   mconstraint = MouseConstraint.create(engine, JsObject{mouse: mouse})
 
-  Composite.add(engine.world, toJs [bullet, mconstraint, 
+  Composite.add(engine.world, toJs [bullet, mconstraint,
     # Walls
     Bodies.rectangle(350, -200, 1000, 20, JsObject{isStatic: true}), # up
     # Bodies.rectangle(690, 250, 20, 500, JsObject{isStatic: true}), # right
@@ -82,7 +86,8 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
 
   ])
 
-  Events.on(engine, "afterUpdate", proc() = 
+  # Set event callbacks
+  Events.on(engine, "afterUpdate", proc() =
     # So that it updates the formula values
     if not kxi.surpressRedraws: redraw(kxi)
   )
@@ -99,7 +104,8 @@ proc load*() = #canvasId: string, canvasWidth, canvasHeight: int, background: st
     Render.endViewTransform(mrender)
   )
 
-proc reload() = 
+## Reloads the simulation
+proc reload() =
   Composite.clear(engine.world)
   Engine.clear(engine)
   Render.stop(mrender)
@@ -107,25 +113,39 @@ proc reload() =
   trail.setLen(0)
   load()
 
-proc sendBulletFlying() = 
-  let hypotenuse = bullet.circleRadius.to(float64) * 0.48 # force magnitude
-  let x = cos(bullet.angle.to(float64)) * hypotenuse
-  let y = sin(bullet.angle.to(float64)) * hypotenuse
+## Since a body's angle can be negative and can be higher than 360, this procedure makes it so it's always positive and inside 0..359
+proc normalizeAngle(rad: float): int =
+  result = int rad.radToDeg()
+  result -= (result div 360) * 360 # Remove excess rotations
+  if result < 0:
+    result = abs result
+  elif result > 0:
+    result = 360 - result
+
+## Since matter measures y since the top of the screen, here we "normalize" it so that the 0 starts at the floor
+proc normalizeY(y: int): int =
+  -y + (floor.position.y.to(int) - (floorHeight div 2) - bullet.circleRadius.to(int))
+
+proc sendBulletFlying() =
+  # let speed = bullet.circleRadius.to(float64) * 0.48 # force magnitude
+  let speed = float64 exercises[currentExercise].speed
+  let x = cos(bullet.angle.to(float64)) * speed
+  let y = sin(bullet.angle.to(float64)) * speed
 
   Body.setVelocity(bullet, JsObject{x: x, y: y})
 
-proc rotateBullet(clockwise = true) = 
-  var rad = degToRad(30d)#(360 / bullet.vertices.length.to(float64))*2)
+proc rotateBullet(clockwise = true) =
+  var rad = degToRad(20d)#(360 / bullet.vertices.length.to(float64))*2)
   if not clockwise:
     rad = -rad
 
   Body.rotate(bullet, rad)
 
-proc calcTrajectory() = 
-  var stop = false
+proc calcTrajectory() =
+  var stop = false # Stop updating the engine
   # let bodies = cloneAllBodies(engine.world)
   let oldb = bullet.structuredClone()
-  print bullet.jsonStringify()
+  # print bullet.jsonStringify()
 
   var formerStaticBodies: seq[JsObject]
   for body in Composite.allBodies(engine.world):
@@ -135,22 +155,24 @@ proc calcTrajectory() =
       else:
         Body.setStatic(body, true)
 
-  proc onCollision(event: JsObject) = 
+  proc onCollision(event: JsObject) =
     if event.pairs[0].bodyA.id == bullet.id:
       stop = true
 
-  sendBulletFlying()
-
   Events.on(engine, "collisionStart", onCollision)
+
+  sendBulletFlying()
 
   trail.setLen(0)
   for i in 1..1000:
-    trail.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
-
+    echo i
+    print bullet.velocity
     if stop:
       exerciseStatus = esEnd
-      finalSpeed = int bullet.speed.to(float)
       break
+
+    finalSpeed = int bullet.speed.to(float)
+    trail.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
 
     Engine.update(engine)
 
@@ -169,53 +191,60 @@ proc calcTrajectory() =
     # Body.setParts(b, oldb.parts)# b.parts = oldb.parts
     # Body.setVertices(b, oldb.vertices)# b.vertices = oldb.vertices
     # b.bounds = oldb.bounds
-    
+
     Body.setPosition(b, oldb.position)
     Body.setAngle(b, oldb.angle)
     Body.setVelocity(b, oldb.velocity)
-    Body.setAngularVelocity(b, oldb.angularVelocity)    
+    Body.setAngularVelocity(b, oldb.angularVelocity)
 
   for body in Composite.allBodies(engine.world):
     if body.id != bullet.id and body.id notin formerStaticBodies:
       Body.setStatic(body, false)
 
-  print bullet.jsonStringify()#Composite.allBodies(engine.world).jsonStringify()
+  # print bullet.jsonStringify()#Composite.allBodies(engine.world).jsonStringify()
 
-proc renderTextDiv*(): VNode = 
-  result = buildHtml tdiv(style = "float: left; width: 50%;".toCss):
+proc renderTextDiv*(): VNode =
+  buildHtml tdiv(style = "float: left; width: 40%;".toCss):
     p(text r"\(a = \frac{v_f - v_i}{\Delta t}\)", style = "font-size: 80px;".toCss)
+
     if not bullet.isNil:
-      var a = int bullet.angle.to(float).radToDeg
-      a -= (a div 360) * 360 # Remove excess rotations
-      if a < 0: a = abs a
-      elif a > 0: a = 360 - a
-        
-      p(text &"x = {int bullet.position.x.to(float)} y = {int bullet.position.y.to(float)}")
-      p(text &"angle = {a}")
-      if exerciseStatus != esNone:
-        p(text &"Vi = {int bullet.speed.to(float)}")
-        if exerciseStatus == esEnd:
-          p(text &"Vf = {finalSpeed}")
-        else:
-          p(text &"Vf = ?")
-          
+      p(text &"x = {int bullet.position.x.to(float)} y = {normalizeY(int bullet.position.y.to(float))}")
+      p(text &"angle = {normalizeAngle(bullet.angle.to(float))}")
+
+      if currentExercise > -1:
+        let exercise = exercises[currentExercise]
+        p(text &"Vi = {exercise.speed}")
+        # if exerciseStatus == esEnd:
+        p(text &"Vf = {finalSpeed}")
+        # else:
+          # p(text &"Vf = ?")
+
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
-proc renderSimDiv*(): VNode = 
-  result = buildHtml tdiv(style = "float: right; width: 50%;".toCss):
+proc renderSimDiv*(): VNode =
+  proc exerciseOnClick(current: int): proc =
+    proc () =
+      let exercise = exercises[current]
+      currentExercise = current
+      Body.setPosition(bullet, JsObject{x: exercise.pos.x, y: normalizeY(exercise.pos.y)})
+      Body.setAngle(bullet, degToRad(exercise.angle))
+      calcTrajectory()
+      exerciseStatus = esStart
+
+  buildHtml tdiv(style = "float: right; width: 40%;".toCss):
     button():
       text "Start the simulation"
       proc onclick()  =
           engine.timing.timeScale = 1
-      
+
     button():
       text "Stop the simulation"
-      proc onclick() = 
+      proc onclick() =
         engine.timing.timeScale = 0
 
     button():
       text "Rotate"
-      proc onclick() = 
+      proc onclick() =
         rotateBullet()
 
     button(onclick = calcTrajectory):
@@ -223,37 +252,29 @@ proc renderSimDiv*(): VNode =
 
     button():
       text "Rot & Traj"
-      proc onclick() = 
+      proc onclick() =
         rotateBullet()
         calcTrajectory()
 
     button():
       text "Send ball flying"
-      proc onclick() = 
+      proc onclick() =
         sendBulletFlying()
-      
+
     canvas(id = "canvas", style = fmt"width: {canvasWidth}px; height: {canvasHeight}px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
 
     tdiv(id = "exercises", style = "height: 200px; overflow-y: auto;".toCss):
       for e, exercise in exercises:
-        button():
+        button(onclick = exerciseOnClick(e)):
           text &"#{e+1} {exercise}"
 
-          proc onclick() = 
-            # Since matter measures y since the top of the screen, here we convert it so that the 0 starts at the floor
-            let y = -(exercise.pos.y) + (floor.position.y.to(int) - (floorHeight div 2) - bullet.circleRadius.to(int))
-            Body.setPosition(bullet, JsObject{x: exercise.pos.x, y: y})
-            Body.setAngle(bullet, degToRad(exercise.angle))
-            calcTrajectory()
-            exerciseStatus = esBegin
-
-proc render*(params: Params): VNode =
-  result = buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):
+proc render*(): VNode =
+  buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):
     renderTextDiv()
     renderSimDiv()
 
-document.addEventListener("keyup", proc (event: Event) = 
+document.addEventListener("keyup", proc (event: Event) =
   let event = KeyboardEvent(event)
   case $event.key
   of "t":
@@ -269,7 +290,12 @@ document.addEventListener("keyup", proc (event: Event) =
   of "Backspace":
     reload()
   of "p":
-    jsonPrint mconstraint, bullet
+    if engine.timing.timeScale.to(int) == 0:
+      engine.timing.timeScale = 1
+    else:
+      engine.timing.timeScale = 0
+  of "d":
+    jsonPrint bullet
 )
 
 
