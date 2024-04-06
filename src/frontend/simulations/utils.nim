@@ -8,6 +8,8 @@ var
   undefined* {.importjs, nodecl.}: JsObject
   Object* {.importjs, nodecl.}: JsObject
 
+proc jsSleep*(ms: int) {.importjs: "await new Promise(r => setTimeout(r, #))".}
+
 proc jsFloatToInt*(o: JsObject): JsObject {.importjs: "~~#".}
 
 proc structuredClone*(o: JsObject): JsObject {.importjs: "structuredClone(#)".}
