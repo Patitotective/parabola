@@ -6,17 +6,23 @@ import matter, utils
 type
   Exercise = object
     pos: tuple[x, y: int]
-    angle: float
+    angle: float # Degrees
+    angleRad: float
     speed: int
+    velocity: tuple[x, y: float]
 
   ExerciseStatus = enum
     esStart # Not launched yet
     esStarted # In the air
     esEnd # Touched something and stopped
 
+proc initExercise(pos: tuple[x, y: int], angle: float, speed: int): Exercise = 
+  let angleRad = degToRad(angle)
+  Exercise(pos: pos, angle: angle, angleRad: angleRad, speed: speed, velocity: (x: cos(angleRad) * speed.float, y: sin(angleRad) * speed.float))
+
 const
   deltaTime = 1000 / 60 # 60fps, 60 times in one second (1000 milliseconds)
-  secPerTick = 1 / 60
+  secPerFrame = 1 / 60
   canvasWidth = 700
   canvasHeight = 500
   floorHeight = 20
@@ -32,7 +38,7 @@ var
   trail = newSeq[JsVector]()
   mConstraintDragEnded*: bool # True when you release the mouse constraint
 
-  exercises = @[Exercise(pos: (50, 0), angle: 67, speed: 12)]
+  exercises = @[initExercise(pos = (50, 0), angle = 67, speed = 12)]
   currentExercise = -1
   exerciseStatus: ExerciseStatus
   exerciseTotalTime: float
@@ -78,7 +84,7 @@ proc load*() =
 
   Composite.add(engine.world, toJs [bullet, mconstraint,
     # Walls
-    # Bodies.rectangle(350, -200, 1000, 20, JsObject{isStatic: true}), # up
+     Bodies.rectangle(350, -200, 1000, 20, JsObject{isStatic: true}), # up
     # Bodies.rectangle(690, 250, 20, 500, JsObject{isStatic: true}), # right
     floor, # down
     # Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
@@ -125,17 +131,16 @@ proc normalizeAngle(rad: float): int =
     result = 360 - result
   # echo "final ", result
 
-## Since matter measures y since the top of the screen, here we "normalize" it so that the 0 starts at the floor
+## Since matter measures y from the top of the screen, here we "normalize" it so that the 0 starts at the floor
 proc normalizeY(y: int): int =
   -y + (floor.position.y.to(int) - (floorHeight div 2) - bullet.circleRadius.to(int))
 
 proc sendBulletFlying() =
   # let speed = bullet.circleRadius.to(float64) * 0.48 # force magnitude
-  let speed = float64 exercises[currentExercise].speed.float
-  let x = cos(bullet.angle.to(float64)) * speed
-  let y = sin(bullet.angle.to(float64)) * speed
+  let exercise = exercises[currentExercise]
 
-  Body.setVelocity(bullet, JsObject{x: x, y: y})
+  # Invert velocity y since matter's coordinates start from the top instead of the bottom
+  Body.setVelocity(bullet, JsObject{x: exercise.velocity.x, y: -exercise.velocity.y})
 
 proc rotateBullet(clockwise = true) =
   var rad = degToRad(20d)#(360 / bullet.vertices.length.to(float64))*2)
@@ -147,6 +152,8 @@ proc rotateBullet(clockwise = true) =
 proc calcTrajectory() {.async.} =
   var stop = false # Stop updating the engine
   # let bodies = cloneAllBodies(engine.world)
+  let e = exercises[currentExercise]
+  let g = engine.gravity.y.to(float) * engine.gravity.scale.to(float)
   let oldb = bullet.structuredClone()
   # print bullet.jsonStringify()
 
@@ -169,7 +176,11 @@ proc calcTrajectory() {.async.} =
   trail.setLen(0)
   for i in 1..500:
     if stop:
-      exerciseTotalTime = i.float * secPerTick
+      echo &"2 * {e.velocity.y} / {g}"
+      echo &"{2 * e.velocity.y} / {g}"
+      echo &"{(2 * e.velocity.y) / g}" 
+      echo &"{(2 * e.velocity.y) / 9.8}" 
+      exerciseTotalTime = (2 * e.velocity.y) / g #i.float * secPerTick
       exerciseStatus = esEnd
       break
 
@@ -206,7 +217,7 @@ proc calcTrajectory() {.async.} =
 
 proc renderTextDiv*(): VNode =
   buildHtml tdiv(style = "float: left; width: 40%;".toCss):
-    p(text r"\(a = \frac{v_f - v_i}{\Delta t}\)", style = "font-size: 80px;".toCss)
+    p(text r"\(t_f = \frac{2 \cdot v_i \cdot \sin(\theta)}{g}\)", style = "font-size: 80px;".toCss)
 
     if not bullet.isNil:
       p(text &"x = {int bullet.position.x.to(float)} y = {normalizeY(int bullet.position.y.to(float))}")
@@ -231,14 +242,12 @@ proc renderSimDiv*(): VNode =
 
   buildHtml tdiv(style = "float: right; width: 40%;".toCss):
     button():
-      text "Start the simulation"
+      text "Pause/Resume"
       proc onclick()  =
+        if engine.timing.timeScale.to(int) == 0:
           engine.timing.timeScale = 1
-
-    button():
-      text "Stop the simulation"
-      proc onclick() =
-        engine.timing.timeScale = 0
+        else:
+          engine.timing.timeScale = 0
 
     button():
       text "Rotate"
