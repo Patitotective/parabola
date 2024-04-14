@@ -6,7 +6,7 @@ import matter, utils
 type
   Exercise = object
     pos: tuple[x, y: int]
-    angle: float # Degrees
+    angle: int # Degrees
     angleRad: float
     speed: int
     velocity: tuple[x, y: float]
@@ -16,9 +16,9 @@ type
     esStarted # In the air
     esEnd # Touched something and stopped
 
-proc initExercise(pos: tuple[x, y: int], angle: float, speed: int): Exercise = 
-  let angleRad = degToRad(angle)
-  Exercise(pos: pos, angle: angle, angleRad: angleRad, speed: speed, velocity: (x: cos(angleRad) * speed.float, y: sin(angleRad) * speed.float))
+proc initExercise(pos: tuple[x, y: int], angle: int, speed: int): Exercise = 
+  let angleRad = degToRad(float angle)
+  Exercise(pos: pos, angle: angle, angleRad: angleRad, speed: speed, velocity: speedToVelRad(float speed, angleRad))
 
 const
   deltaTime = 1000 / 60 # 60fps, 60 times in one second (1000 milliseconds)
@@ -38,8 +38,9 @@ var
   trail = newSeq[JsVector]()
   mConstraintDragEnded*: bool # True when you release the mouse constraint
 
-  exercises = @[initExercise(pos = (50, 0), angle = 67, speed = 12)]
-  currentExercise = -1
+  # The first exercise is the default exercise and it is modifed as you modify the bullet
+  exercises = @[initExercise(pos = (canvasWidth div 2, 0), angle = 0, speed = 20), initExercise(pos = (50, 0), angle = 48, speed = 30)]
+  curExercise = 0
   exerciseStatus: ExerciseStatus
   exerciseTotalTime: float
 
@@ -53,8 +54,8 @@ proc load*() =
   loadMatterAliases()
 
   canvas = getElementById("canvas")
-  engine = Engine.create()#(JsObject{gravity: JsObject{x: 0, y: 9.8}, scale: 0.1})
-  mrender = Render.create(JsObject{
+  engine = createEngine(JsObject{gravity: JsObject{x: 0, y: 1, scale: 0.001}})
+  mrender = createRender(JsObject{
     canvas: canvas,
     engine: engine,
     options: JsObject{
@@ -75,7 +76,7 @@ proc load*() =
   Body.setInertia(bullet, Infinity)
   # Body.setAngle(bullet, degToRad(180d))
 
-  # constraint = Constraint.create(JsObject{pointA: JsObject{x: 400, y: 300}, bodyB: bullet, length: 30, stiffness: 0.1})
+  # constraint = Constraint.create(JsObject{pointA: jsVector(400, 300), bodyB: bullet, length: 30, stiffness: 0.1})
 
   floor = Bodies.rectangle(350, 495, 1200, floorHeight, JsObject{isStatic: true})
 
@@ -137,10 +138,10 @@ proc normalizeY(y: int): int =
 
 proc sendBulletFlying() =
   # let speed = bullet.circleRadius.to(float64) * 0.48 # force magnitude
-  let exercise = exercises[currentExercise]
+  let exercise = exercises[curExercise]
 
   # Invert velocity y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, JsObject{x: exercise.velocity.x, y: -exercise.velocity.y})
+  Body.setVelocity(bullet, jsVector(exercise.velocity.x / 3, -exercise.velocity.y / 3))
 
 proc rotateBullet(clockwise = true) =
   var rad = degToRad(20d)#(360 / bullet.vertices.length.to(float64))*2)
@@ -149,11 +150,16 @@ proc rotateBullet(clockwise = true) =
 
   Body.rotate(bullet, rad)
 
+  curExercise = 0
+  exercises[0].angle = normalizeAngle(bullet.angle.to(float))
+  exercises[0].angleRad = degToRad(float exercises[0].angle)
+  exercises[0].velocity = speedToVelRad(float exercises[0].speed, exercises[0].angleRad)
+
 proc calcTrajectory() {.async.} =
   var stop = false # Stop updating the engine
   # let bodies = cloneAllBodies(engine.world)
-  let e = exercises[currentExercise]
-  let g = engine.gravity.y.to(float) * engine.gravity.scale.to(float)
+  let e = exercises[curExercise]
+  #let g = engine.gravity.y.to(float) * engine.gravity.scale.to(float)
   let oldb = bullet.structuredClone()
   # print bullet.jsonStringify()
 
@@ -176,11 +182,10 @@ proc calcTrajectory() {.async.} =
   trail.setLen(0)
   for i in 1..500:
     if stop:
-      echo &"2 * {e.velocity.y} / {g}"
-      echo &"{2 * e.velocity.y} / {g}"
-      echo &"{(2 * e.velocity.y) / g}" 
+      echo &"2 * {e.velocity.y} / 9.8"
+      echo &"{2 * e.velocity.y} / 9.8" 
       echo &"{(2 * e.velocity.y) / 9.8}" 
-      exerciseTotalTime = (2 * e.velocity.y) / g #i.float * secPerTick
+      exerciseTotalTime = (2 * e.velocity.y) / 9.8 #i.float * secPerTick
       exerciseStatus = esEnd
       break
 
@@ -223,10 +228,9 @@ proc renderTextDiv*(): VNode =
       p(text &"x = {int bullet.position.x.to(float)} y = {normalizeY(int bullet.position.y.to(float))}")
       p(text &"angle = {normalizeAngle(bullet.angle.to(float))}")
 
-      if currentExercise > -1:
-        let exercise = exercises[currentExercise]
-        p(text &"Vi = {exercise.speed}")
-        p(text &"t = {exerciseTotalTime:.2f}")
+      let exercise = exercises[curExercise]
+      p(text &"Vi = {exercise.speed}")
+      p(text &"t = {exerciseTotalTime:.2f}")
 
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
@@ -234,9 +238,9 @@ proc renderSimDiv*(): VNode =
   proc exerciseOnClick(current: int): proc =
     proc () =
       let exercise = exercises[current]
-      currentExercise = current
-      Body.setPosition(bullet, JsObject{x: exercise.pos.x, y: normalizeY(exercise.pos.y)})
-      Body.setAngle(bullet, degToRad(360 - exercise.angle))
+      curExercise = current
+      Body.setPosition(bullet, jsVector(exercise.pos.x, normalizeY(exercise.pos.y)))
+      Body.setAngle(bullet, degToRad(float(360 - exercise.angle)))
       discard calcTrajectory()
       exerciseStatus = esStart
 
@@ -274,8 +278,10 @@ proc renderSimDiv*(): VNode =
 
     tdiv(id = "exercises", style = "height: 200px; overflow-y: auto;".toCss):
       for e, exercise in exercises:
+        if e == 0: continue # First exercise is the default exercise
+
         button(onclick = exerciseOnClick(e)):
-          text &"#{e+1} {exercise}"
+          text &"#{e} {exercise}"
 
 proc render*(): VNode =
   buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):
@@ -302,6 +308,12 @@ document.addEventListener("keyup", proc (event: Event) =
       engine.timing.timeScale = 1
     else:
       engine.timing.timeScale = 0
+  of "r":
+    let exercise = exercises[curExercise]
+    Body.setPosition(bullet, jsVector(exercise.pos.x, normalizeY(exercise.pos.y)))
+    Body.setAngle(bullet, degToRad(float(360 - exercise.angle)))
+    discard calcTrajectory()
+    exerciseStatus = esStart
   of "d":
     jsonPrint bullet
 )

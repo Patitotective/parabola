@@ -1,4 +1,4 @@
-import std/jsffi
+import std/[jsffi, math]
 
 import matter
 
@@ -63,3 +63,9 @@ proc forceToVelocity*(force: float64, mass: float64, deltaTime = 16.666): float6
 proc cloneAllBodies*(world: JsObject): seq[JsObject] =
   structuredClone(Composite.allBodies(world)).to(seq[JsObject])
 
+proc speedToVelDeg*(speed, angleDeg: float): tuple[x, y: float] = 
+  let angleRad = degToRad(angleDeg)
+  (x: cos(angleRad) * speed, y: sin(angleRad) * speed)
+
+proc speedToVelRad*(speed, angleRad: float): tuple[x, y: float] = 
+  (x: cos(angleRad) * speed, y: sin(angleRad) * speed)
