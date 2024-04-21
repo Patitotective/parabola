@@ -54,7 +54,7 @@ proc load*() =
   loadMatterAliases()
 
   canvas = getElementById("canvas")
-  engine = createEngine(JsObject{gravity: JsObject{x: 0, y: 1, scale: 0.001}})
+  engine = createEngine(JsObject{gravity: JsObject{x: 0, y: 1, scale: 0.001}, timing: JsObject{timeScale: 0.65}})
   mrender = createRender(JsObject{
     canvas: canvas,
     engine: engine,
@@ -100,6 +100,12 @@ proc load*() =
     if not kxi.surpressRedraws: redraw(kxi)
   )
 
+  Events.on(engine, "collisionStart", proc(event: JsObject) = 
+    if exerciseStatus == esStarted and event.pairs[0].bodyA.id == bullet.id:
+      exerciseStatus = esEnd
+  )
+
+
   Events.on(mrender, "afterRender", proc() =
     Render.startViewTransform(mrender)
     mrender.context.globalAlpha = 0.7
@@ -107,6 +113,10 @@ proc load*() =
     for i in trail:
       mrender.context.fillStyle = cstring"orange"
       mrender.context.fillRect(JsObject(i).x, JsObject(i).y, 2, 2)
+
+    if exerciseStatus == esStarted:
+      let pos = bullet.position
+      drawArrow(mrender.context, pos.x, pos.y, pos.x + (bullet.velocity.x * toJs 10), pos.y + (bullet.velocity.y * toJs 10), toJs 5, toJs cstring"white")
 
     mrender.context.globalAlpha = 1
     Render.endViewTransform(mrender)
@@ -136,12 +146,15 @@ proc normalizeAngle(rad: float): int =
 proc normalizeY(y: int): int =
   -y + (floor.position.y.to(int) - (floorHeight div 2) - bullet.circleRadius.to(int))
 
-proc sendBulletFlying() =
+proc sendBulletFlying(changeStatus = true) =
+  if changeStatus:
+    exerciseStatus = esStarted
+
   # let speed = bullet.circleRadius.to(float64) * 0.48 # force magnitude
   let exercise = exercises[curExercise]
 
   # Invert velocity y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVector(exercise.velocity.x / 3, -exercise.velocity.y / 3))
+  Body.setVelocity(bullet, jsVector(exercise.velocity.x / 2.5, -exercise.velocity.y / 2.5))
 
 proc rotateBullet(clockwise = true) =
   var rad = degToRad(20d)#(360 / bullet.vertices.length.to(float64))*2)
@@ -177,14 +190,11 @@ proc calcTrajectory() {.async.} =
 
   Events.on(engine, "collisionStart", onCollision)
 
-  sendBulletFlying()
+  sendBulletFlying(changeStatus = false)
 
   trail.setLen(0)
   for i in 1..500:
     if stop:
-      echo &"2 * {e.velocity.y} / 9.8"
-      echo &"{2 * e.velocity.y} / 9.8" 
-      echo &"{(2 * e.velocity.y) / 9.8}" 
       exerciseTotalTime = (2 * e.velocity.y) / 9.8 #i.float * secPerTick
       exerciseStatus = esEnd
       break
@@ -281,7 +291,7 @@ proc renderSimDiv*(): VNode =
         if e == 0: continue # First exercise is the default exercise
 
         button(onclick = exerciseOnClick(e)):
-          text &"#{e} {exercise}"
+          text &"#{e} angle = {exercise.angle} vi pos = ({exercise.pos.x}, {exercise.pos.x})"
 
 proc render*(): VNode =
   buildHtml tdiv(style = "width: 100%; justify-content: center; align-items: center;".toCss):

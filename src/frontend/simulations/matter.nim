@@ -27,6 +27,7 @@ type
 proc createEngine*(options: JsObject = nil): JsObject {.importjs: "Matter.Engine.create(#)".}
 proc createRender*(options: JsObject): JsObject {.importjs: "Matter.Render.create(#)".}
 proc jsVector*(x, y: SomeNumber): JsVector = JsVector JsObject{x: x, y: y}
+proc jsVector*(x, y: JsObject): JsVector = JsVector JsObject{x: x, y: y}
 
 proc `*`*(v1, v2: JsVector): JsVector =
   JsVector JsObject{x: JsObject(v1).x * JsObject(v2).x, y: JsObject(v1).y * JsObject(v2).y}
