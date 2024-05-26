@@ -4,7 +4,7 @@ import std/[jsffi]
 
 var
   Matter* {.importjs, nodecl.}: JsObject
-  Body*, Vector*, Engine*, Render*, Runner*, Bodies*, Events*, Composite*, MouseConstraint*, Mouse*, Constraint*: JsObject
+  Body*, Vector*, Engine*, Render*, Runner*, Bodies*, Bounds*, Events*, Composite*, MouseConstraint*, Mouse*, Constraint*: JsObject
 
 # This function is used to load Matter's aliases
 # since when using plugins you should reload aliases
@@ -15,6 +15,7 @@ proc loadMatterAliases*() =
   Render = Matter.Render
   Runner = Matter.Runner
   Bodies = Matter.Bodies
+  Bounds = Matter.Bounds
   Events = Matter.Events
   Composite = Matter.Composite
   MouseConstraint = Matter.MouseConstraint

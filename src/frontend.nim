@@ -5,14 +5,14 @@ import karax/[karax, kajax, karaxdsl, vdom, vstyles, i18n, jdict, languages]
 
 # import matter
 import frontend/[routes, utils, patterns]
-from frontend/simulations/parabola import nil
+import frontend/simulations/parabola
 
 type
   State = ref object
     prevTitle*: cstring # Title of the previous page when using navigateTo()
     location*: Location
-    simulationIndex*: int # Current simulation index
     matterLoaded*: bool
+    parabola*: ParabolaState
 
 proc deepCopy(l: Location): Location =
   Location(
@@ -28,7 +28,10 @@ proc deepCopy(l: Location): Location =
   )
 
 proc newState(): State =
-  State(location: window.location.deepCopy(), prevTitle: document.title, simulationIndex: -1)
+  result = State(location: window.location.deepCopy(), prevTitle: document.title, 
+    parabola: initParabolaState()
+  )
+  result.parabola.addEventListeners()
 
 proc navigateTo(uri: cstring) =
   # Add uri to the history
@@ -42,38 +45,25 @@ var state = newState()
 # addTranslation(esCo, "s/0/")
 
 proc renderHome(params: Params): VNode =
+  navigateTo("/s/0")
+  
   buildHtml(tdiv):
     text "Welcome to my grado project"
-
-# proc renderSimulation(params: Params): VNode =
-#   buildHtml(tdiv):
-
-const simulations = [
-  (load: parabola.load, render: parabola.render),
-]
 
 proc render(): VNode =
   buildHtml(tdiv):
     # renderHeader()
     state.location.route([
-      r("/s/@id", proc(params: Params): VNode =
-        try:
-          state.simulationIndex = params["id"].parseInt()
-        except ValueError:
-          return renderError404()
-
-        if state.simulationIndex in simulations.low..simulations.high:
-          simulations[state.simulationIndex].render()
-        else:
-          renderError404()
+      r("/parabola", proc(params: Params): VNode =
+        state.parabola.render()
       ),
       r("/", renderHome)
     ])
 
 proc postRender() =
   # Since matter needs to find the canvas element, if we load the simulation before karax has created the canvas element it won't work
-  if not state.matterLoaded and state.simulationIndex in simulations.low..simulations.high:
-    simulations[state.simulationIndex].load()
+  if not state.matterLoaded:
+    state.parabola.load()
     state.matterLoaded = true
 
 # This event is (usually only) called when the user moves back in history
