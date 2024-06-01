@@ -30,6 +30,15 @@ proc createRender*(options: JsObject): JsObject {.importjs: "Matter.Render.creat
 proc jsVector*(x, y: SomeNumber): JsVector = JsVector JsObject{x: x, y: y}
 proc jsVector*(x, y: JsObject): JsVector = JsVector JsObject{x: x, y: y}
 
+proc `x`*(v: JsVector): float64 = 
+  JsObject(v).x.to(float64)
+
+proc `y`*(v: JsVector): float64 = 
+  JsObject(v).y.to(float64)
+
+proc toTuple*(v: JsVector): tuple[x, y: float64] = 
+  (x: v.x, y: v.y)
+
 proc `*`*(v1, v2: JsVector): JsVector =
   JsVector JsObject{x: JsObject(v1).x * JsObject(v2).x, y: JsObject(v1).y * JsObject(v2).y}
 
@@ -53,5 +62,3 @@ proc `-`*(v1: JsVector, v2: float64): JsVector =
 
 proc `/`*(v1: JsVector, v2: float64): JsVector =
   JsVector JsObject{x: JsObject(v1).x / v2.toJs, y: JsObject(v1).y / v2.toJs}
-
-

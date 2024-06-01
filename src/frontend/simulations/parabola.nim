@@ -115,6 +115,93 @@ proc rotate(canon: var Canon, rad = degToRad(canonRotationDeg)) =
 proc rotateBack(canon: var Canon, rad = degToRad(canonRotationDeg)) =
   canon.rotate(-rad)
 
+proc nextBulletPosition(state: ParabolaState): JsVector = 
+  let vertice1 = state.canon.body.vertices[1]
+  let vertice2 = state.canon.body.vertices[2]
+  jsVector((vertice1.x + vertice2.x) / toJs 2, (vertice1.y + vertice2.y) / toJs 2)
+
+proc calcTrajectory(state: var ParabolaState) =
+  let pos = state.nextBulletPosition().toTuple()
+  let vel = state.canon.state.velocity
+  let g = to(state.engine.gravity.y * state.engine.gravity.scale, float) * 1750
+  echo (p: pos, v: vel, g: g)
+
+  state.canon.trajectory.setLen(0)
+  var i = 0d
+  while i < 100:
+    let x = pos.x + (vel.x * i.float)
+    let y = pos.y + (-vel.y * i.float) + (g * 0.5 * (i.float ^ 2))
+
+    state.canon.trajectory.add JsVector JsObject{x: x, y: y}
+    i += 0.5
+
+proc loadEvents(state: var ParabolaState) = 
+  Events.on(state.mouseConstraint, "mousedown", proc(event: JsObject) = 
+    if Bounds.contains(state.canon.body.bounds, event.mouse.position).to(bool):
+      state.canon.isDragging = true
+  )
+
+  Events.on(state.mouseConstraint, "mouseup", proc(event: JsObject) = 
+    state.canon.isDragging = false
+  )
+
+  # Set event callbacks
+  Events.on(state.engine, "afterUpdate", proc() =
+    # So that it updates the formula values
+    #if not kxi.surpressRedraws: redraw(kxi) # TODO: REALLY INEFFICIENT
+    if state.canon.isDragging:
+      let targetAngle = Vector.angle(canonPivot, state.mouse.position)
+      state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
+      state.calcTrajectory()
+  )
+
+  Events.on(state.engine, "collisionStart", proc(event: JsObject) = 
+    if state.canon.bullets.len > 0 and state.canon.status == csFlight:
+      for pair in items(event.pairs):
+        if pair.bodyA.id == state.canon.bullet.id or pair.bodyB.id == state.canon.bullet.id:
+          state.canon.status = csHit
+          break
+  )
+
+  Events.on(state.render, "afterRender", proc() =
+    Render.startViewTransform(state.render)
+    state.render.context.globalAlpha = 0.7
+
+    for p in state.canon.trajectory:
+      state.render.context.fillStyle = cstring trajectoryColor
+      state.render.context.fillRect(JsObject(p).x, JsObject(p).y, 2, 2)
+
+    if state.canon.bullets.len > 0 and state.canon.status == csFlight:
+      let pos = state.canon.bullet.position
+
+      drawArrow(state.render.context, pos.x, pos.y, 
+        pos.x,
+        pos.y + (state.canon.bullet.velocity.y * toJs velocityVectorScale), 
+        toJs 4, toJs cstring"red"
+      )
+
+      drawArrow(state.render.context, pos.x, pos.y, 
+        pos.x + (state.canon.bullet.velocity.x * toJs velocityVectorScale), 
+        pos.y,
+        toJs 4, toJs cstring"blue"
+      )
+
+      #drawArrow(state.render.context, pos.x, pos.y, 
+      #  pos.x + (state.canon.bullet.velocity.x * toJs 9), 
+      #  pos.y + (state.canon.bullet.velocity.y * toJs 9), 
+      #  toJs 4, toJs cstring"white"
+      #)
+
+    state.render.context.globalAlpha = 1
+    Render.endViewTransform(state.render)
+  )
+
+  Events.on(state.engine.world, "afterAdd", proc() =
+    state.engine.world.bodies = state.engine.world.bodies.to(seq[JsObject]).sorted(proc(a, b: JsObject): int =
+      to(a.collisionFilter.category - b.collisionFilter.category, int)
+    )
+  )
+
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
   # Render all MathJax expressions asynchronously
@@ -175,70 +262,7 @@ proc load*(state: var ParabolaState) =
     # Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
   ])
 
-  Events.on(state.mouseConstraint, "mousedown", proc(event: JsObject) = 
-    if Bounds.contains(state.canon.body.bounds, event.mouse.position).to(bool):
-      state.canon.isDragging = true
-  )
-
-  Events.on(state.mouseConstraint, "mouseup", proc(event: JsObject) = 
-    state.canon.isDragging = false
-  )
-
-  # Set event callbacks
-  Events.on(state.engine, "afterUpdate", proc() =
-    # So that it updates the formula values
-    #if not kxi.surpressRedraws: redraw(kxi) # TODO: REALLY INEFFICIENT
-    if state.canon.isDragging:
-      let targetAngle = Vector.angle(canonPivot, state.mouse.position)
-      state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
-  )
-
-  Events.on(state.engine, "collisionStart", proc(event: JsObject) = 
-    if state.canon.bullets.len > 0 and state.canon.status == csFlight:
-      for pair in items(event.pairs):
-        if pair.bodyA.id == state.canon.bullet.id or pair.bodyB.id == state.canon.bullet.id:
-          state.canon.status = csHit
-          break
-  )
-
-  Events.on(state.render, "afterRender", proc() =
-    Render.startViewTransform(state.render)
-    state.render.context.globalAlpha = 0.7
-
-    for p in state.canon.trajectory:
-      state.render.context.fillStyle = cstring trajectoryColor
-      state.render.context.fillRect(JsObject(p).x, JsObject(p).y, 2, 2)
-
-    if state.canon.bullets.len > 0 and state.canon.status == csFlight:
-      let pos = state.canon.bullet.position
-      print state.canon.bullet.velocity
-      drawArrow(state.render.context, pos.x, pos.y, 
-        pos.x,
-        pos.y + (state.canon.bullet.velocity.y * toJs velocityVectorScale), 
-        toJs 4, toJs cstring"red"
-      )
-
-      drawArrow(state.render.context, pos.x, pos.y, 
-        pos.x + (state.canon.bullet.velocity.x * toJs velocityVectorScale), 
-        pos.y,
-        toJs 4, toJs cstring"blue"
-      )
-
-      #drawArrow(state.render.context, pos.x, pos.y, 
-      #  pos.x + (state.canon.bullet.velocity.x * toJs 9), 
-      #  pos.y + (state.canon.bullet.velocity.y * toJs 9), 
-      #  toJs 4, toJs cstring"white"
-      #)
-
-    state.render.context.globalAlpha = 1
-    Render.endViewTransform(state.render)
-  )
-
-  Events.on(state.engine.world, "afterAdd", proc() =
-    state.engine.world.bodies = state.engine.world.bodies.to(seq[JsObject]).sorted(proc(a, b: JsObject): int =
-      to(a.collisionFilter.category - b.collisionFilter.category, int)
-    )
-  )
+  state.loadEvents()
 
 ## Reloads the simulation
 proc reload*(state: var ParabolaState) =
@@ -250,16 +274,13 @@ proc reload*(state: var ParabolaState) =
   state.load()
 
 ## Since matter measures y from the top of the screen, here we "normalize" it so that the 0 starts at the ground
-proc normalizeBulletY(state: ParabolaState, y: int, bulletRadius: int): int =
-  -y + (state.ground.position.y.to(int) - (groundHeight div 2) - bulletRadius)
+proc normalizeY(state: ParabolaState, y: int, height: int): int =
+  -y + (state.ground.position.y.to(int) - (groundHeight div 2) - height)
 
 proc fireBullet(state: var ParabolaState) = 
-  let vertice1 = state.canon.body.vertices[1]
-  let vertice2 = state.canon.body.vertices[2]
-  
+  let pos = JsObject state.nextBulletPosition()
   let bullet = Bodies.circle(
-    (vertice1.x + vertice2.x) / toJs 2, 
-    (vertice1.y + vertice2.y) / toJs 2,
+    pos.x, pos.y, 
     state.canon.bulletRadius, state.canon.bulletOptions
   )
 
@@ -278,7 +299,7 @@ proc fireBullet(state: var ParabolaState) =
   # Invert velocity y since matter's coordinates start from the top instead of the bottom
   Body.setVelocity(bullet, jsVector(velocity.x / 2.5, -velocity.y / 2.5))
 
-proc calcTrajectory(state: var ParabolaState) {.async.} =
+proc calcTrajectory2(state: var ParabolaState) {.async.} =
   var stop = false # Stop updating the engine
 
   state.fireBullet()
@@ -338,7 +359,7 @@ proc renderTextDiv*(state: ParabolaState): VNode =
     let bullet = state.canon.bullet
 
     x = int bullet.position.x.to(float)
-    y = state.normalizeBulletY(int bullet.position.y.to(float), bullet.circleRadius.to(int))
+    y = state.normalizeY(int bullet.position.y.to(float), bullet.circleRadius.to(int))
     angle = normalizeAngle(bullet.angle.to(float))
     speed = state.canon.state.speed
 
@@ -372,18 +393,18 @@ proc renderSimDiv*(state: var ParabolaState): VNode =
       span(class = "material-symbols-outlined", text "rotate_left")
       proc onclick() =
         state.canon.rotateBack()
-        discard state.calcTrajectory()
+        state.calcTrajectory()
 
     button():
       span(class = "material-symbols-outlined", text "rotate_right")
       proc onclick() =
         state.canon.rotate()
-        discard state.calcTrajectory()
+        state.calcTrajectory()
 
     #button():
     #  verbatim parabolaIconSvg
     #  #img(src = "/public/img/parabola.svg", alt = "Parabola Trajectory")
-    #  proc onclick() = discard calcTrajectory()
+    #  proc onclick() = calcTrajectory()
     #  #text "Trajectory"
 
     button():
@@ -430,13 +451,13 @@ proc addEventListeners*(state: var ParabolaState) =
     echo $event.key
     case $event.key
     of "t":
-      discard state.calcTrajectory()
+      state.calcTrajectory()
     of "ArrowRight":
       state.canon.rotate()
-      discard state.calcTrajectory()
+      state.calcTrajectory()
     of "ArrowLeft":
       state.canon.rotateBack()
-      discard state.calcTrajectory()
+      state.calcTrajectory()
     of "ArrowUp", " ":
       state.fireBullet()
     of "Backspace":
@@ -446,10 +467,11 @@ proc addEventListeners*(state: var ParabolaState) =
     #of "r":
     #  let exercise = exercises[curExercise]
     #  let bullet = bullets[currentBullet]
-    #  Body.setPosition(bullet, jsVector(exercise.pos.x, state.normalizeBulletY(exercise.pos.y)))
+    #  Body.setPosition(bullet, jsVector(exercise.pos.x, state.normalizeY(exercise.pos.y)))
     #  Body.setAngle(bullet, degToRad(float(360 - exercise.angle)))
-    #  discard calcTrajectory()
+    #  calcTrajectory()
     #  exerciseStatus = csReady
-    #of "d":
+    of "d":
       echo state
+      print state.canon.bullet
   )
