@@ -161,5 +161,4 @@ function drawArrow(ctx, fromx, fromy, tox, toy, arrowWidth, color){
 
 proc drawArrow*(ctx, fromx, fromy, tox, toy, arrowWidth, color: JsObject) {.importjs: "drawArrow(@)".} 
 
-#proc drawArrow*(ctx: JsObject, fromPos, toPos: JsVector, arrowWidth: float, color: string) = 
-#  drawArrow(ctx, JsObject(fromPos).x, JsObject(fromPos).y, JsObject(toPos).x, JsObject(toPos).y, toJs arrowWidth, toJs color.cstring)
+proc newImage*(): JsObject {.importjs: "new Image()".}
