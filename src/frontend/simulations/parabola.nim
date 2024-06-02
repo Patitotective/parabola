@@ -52,8 +52,8 @@ proc initCanonState(angleRad: float, speed: int): CanonState =
   CanonState(angleDeg: angleDeg, angleRad: angleRad, speed: speed, velocity: speedToVelRad(float speed, angleRad))
 
 const
-  deltaTime = 1000 / 60 # 60fps, 60 times in one second (1000 milliseconds)
-  secPerFrame = 1 / 60
+  fps = 60
+  delta = 1000 / fps # 60fps, 60 times in one second (1000 milliseconds)
   timeScale = 0.4
 
   canvasWidth = 700
@@ -66,7 +66,7 @@ const
   canonX = canonWidth
   canonY = canvasHeight - groundHeight - canonHeight
   canonRotationDeg = 20d
-  canonInitialSpeed = 28
+  canonInitialSpeed = 12
   canonTexture = "/public/img/canon.png"
 
   trajectoryColor = "orange"
@@ -120,20 +120,39 @@ proc nextBulletPosition(state: ParabolaState): JsVector =
   let vertice2 = state.canon.body.vertices[2]
   jsVector((vertice1.x + vertice2.x) / toJs 2, (vertice1.y + vertice2.y) / toJs 2)
 
+proc nextBullet(state: var ParabolaState): JsObject = 
+  let pos = JsObject state.nextBulletPosition()
+  result = Bodies.circle(
+    pos.x, pos.y, 
+    state.canon.bulletRadius, state.canon.bulletOptions
+  )
+
+  #Body.setInertia(result, Infinity)
+  #echo (stateAngle: state.canon.state.angleDeg, state)
+  Body.setAngle(result, state.canon.state.angleDeg)
+
 proc calcTrajectory(state: var ParabolaState) =
-  let pos = state.nextBulletPosition().toTuple()
-  let vel = state.canon.state.velocity
-  let g = to(state.engine.gravity.y * state.engine.gravity.scale, float) * 1750
-  echo (p: pos, v: vel, g: g)
+  let bullet = state.nextBullet()
+  let gx = to(state.engine.gravity.x * state.engine.gravity.scale, float)
+  let gy = to(state.engine.gravity.y * state.engine.gravity.scale, float)
+  let velocity = state.canon.state.velocity
+
+  # Invert velocity y since matter's coordinates start from the top instead of the bottom
+  Body.setVelocity(bullet, jsVector(velocity.x, -velocity.y))
 
   state.canon.trajectory.setLen(0)
-  var i = 0d
+  var i = 0
   while i < 100:
-    let x = pos.x + (vel.x * i.float)
-    let y = pos.y + (-vel.y * i.float) + (g * 0.5 * (i.float ^ 2))
+    state.canon.trajectory.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
 
-    state.canon.trajectory.add JsVector JsObject{x: x, y: y}
-    i += 0.5
+    bullet.force.x += bullet.mass * toJs gx
+    bullet.force.y += bullet.mass * toJs gy
+    Body.update(bullet)
+    bullet.force.x = 0
+    bullet.force.y = 0
+    bullet.torque = 0
+
+    inc i
 
 proc loadEvents(state: var ParabolaState) = 
   Events.on(state.mouseConstraint, "mousedown", proc(event: JsObject) = 
@@ -227,7 +246,7 @@ proc load*(state: var ParabolaState) =
   })
   Render.run(state.render)
 
-  state.runner = Runner.create(JsObject{delta: deltaTime})
+  state.runner = Runner.create(JsObject{delta: delta})
   Runner.run(state.runner, state.engine)
 
   # Create and add all bodies to the world
@@ -278,15 +297,7 @@ proc normalizeY(state: ParabolaState, y: int, height: int): int =
   -y + (state.ground.position.y.to(int) - (groundHeight div 2) - height)
 
 proc fireBullet(state: var ParabolaState) = 
-  let pos = JsObject state.nextBulletPosition()
-  let bullet = Bodies.circle(
-    pos.x, pos.y, 
-    state.canon.bulletRadius, state.canon.bulletOptions
-  )
-
-  #Body.setInertia(bullet, Infinity)
-  #echo (stateAngle: state.canon.state.angleDeg, state)
-  Body.setAngle(bullet, state.canon.state.angleDeg)
+  let bullet = state.nextBullet()
 
   Composite.add(state.engine.world, bullet)
   state.canon.bullets.add bullet
@@ -297,52 +308,7 @@ proc fireBullet(state: var ParabolaState) =
   let velocity = state.canon.state.velocity
 
   # Invert velocity y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVector(velocity.x / 2.5, -velocity.y / 2.5))
-
-proc calcTrajectory2(state: var ParabolaState) {.async.} =
-  var stop = false # Stop updating the engine
-
-  state.fireBullet()
-  let bullet = state.canon.bullet
-
-  #var formerStaticBodies: seq[JsObject]
-  #for body in Composite.allBodies(engine.world):
-  #  if body.id != bullet.id:
-  #    if body.isStatic.to(bool) == true:
-  #      formerStaticBodies.add body.id
-  #    else:
-  #      Body.setStatic(body, true)
-
-  proc onCollision(event: JsObject) =
-    for pair in items(event.pairs):
-      if pair.bodyA.id == bullet.id or pair.bodyB.id == bullet.id:
-        stop = true
-        break
-
-  Events.on(state.engine, "collisionStart", onCollision)
-
-  state.canon.trajectory.setLen(0)
-  for i in 1..500:
-    if stop:
-      #exerciseTotalTime = (2 * e.velocity.y) / 9.8 #i.float * secPerTick
-      state.canon.status = csHit
-      break
-
-    state.canon.trajectory.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
-
-    Engine.update(state.engine)
-
-  Events.off(state.engine, "collitionStart", onCollision)
-
-  Composite.remove(state.engine.world, bullet)
-  discard state.canon.bullets.pop()
-  dec state.canon.currentBullet
-
-  #for body in Composite.allBodies(engine.world):
-  #  if body.id != bullet.id and body.id notin formerStaticBodies:
-  #    Body.setStatic(body, false)
-
-  # print bullet.jsonStringify()#Composite.allBodies(engine.world).jsonStringify()
+  Body.setVelocity(bullet, jsVector(velocity.x, -velocity.y))
 
 proc togglePause(state: var ParabolaState) = 
   if state.paused:
