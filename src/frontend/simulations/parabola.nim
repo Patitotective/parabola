@@ -12,7 +12,7 @@ type
   CanonState = object
     angleDeg*: int
     angleRad*: float
-    speed*: int
+    speed*: float
     velocity*: tuple[x, y: float]
 
   Canon = object
@@ -43,18 +43,18 @@ type
     thingy*: JsObject
     ground*: JsObject
 
-proc initCanonState(angleDeg: int, speed: int): CanonState = 
+proc initCanonState(angleDeg: int, speed: float): CanonState = 
   let angleRad = degToRad(float angleDeg)
-  CanonState(angleDeg: angleDeg, angleRad: angleRad, speed: speed, velocity: speedToVelRad(float speed, angleRad))
+  CanonState(angleDeg: angleDeg, angleRad: angleRad, speed: speed, velocity: speedToVelRad(speed, angleRad))
 
-proc initCanonState(angleRad: float, speed: int): CanonState = 
-  let angleDeg = int radToDeg(float angleRad)
-  CanonState(angleDeg: angleDeg, angleRad: angleRad, speed: speed, velocity: speedToVelRad(float speed, angleRad))
+proc initCanonState(angleRad: float, speed: float): CanonState = 
+  let angleDeg = int radToDeg(angleRad)
+  CanonState(angleDeg: angleDeg, angleRad: angleRad, speed: speed, velocity: speedToVelRad(speed, angleRad))
 
 const
   fps = 60
   delta = 1000 / fps # 60fps, 60 times in one second (1000 milliseconds)
-  timeScale = 0.4
+  timeScale = 0.6
 
   #canvasWidth = 700
   #canvasHeight = 500
@@ -72,7 +72,7 @@ const
 
   trajectoryColor = "orange"
 
-  velocityVectorScale = 8
+  velocityVectorScale = 9
 
 let
   canonBaseImg = newImage()
@@ -96,6 +96,9 @@ proc onResize(state: var ParabolaState) =
   canonBaseX = canonPivot.x.to(int) - canonBaseImg.width.to(int) div 2
   canonBaseY = state.canvas.clientHeight - groundHeight - canonBaseImg.height.to(int)
 
+  Body.setPosition(state.canon.body, JsObject{x: canonX, y: canonY})
+  Body.setPosition(state.ground, JsObject{x: state.canvas.clientWidth / 2, y: state.canvas.clientHeight - (groundHeight div 2)})
+
   let wrap = state.wrapObject()
 
   state.canon.bulletOptions.plugin = JsObject{wrap: wrap}
@@ -104,9 +107,6 @@ proc onResize(state: var ParabolaState) =
     bullet.plugin.wrap = wrap
 
   state.thingy.plugin.wrap = wrap
-
-  Body.setPosition(state.canon.body, JsObject{x: canonX, y: canonY})
-  Body.setPosition(state.ground, JsObject{x: state.canvas.clientWidth / 2, y: state.canvas.clientHeight - (groundHeight div 2)})
 
 proc initParabolaState*(): ParabolaState = 
   ParabolaState(canon: Canon(
@@ -141,7 +141,7 @@ proc rotate(canon: var Canon, rad = degToRad(canonRotationDeg)) =
 
   canon.state.angleDeg = normalizeAngle(canon.body.angle.to(float))
   canon.state.angleRad = degToRad(float canon.state.angleDeg)
-  canon.state.velocity = speedToVelRad(float canon.state.speed, canon.state.angleRad)
+  canon.state.velocity = speedToVelRad(canon.state.speed, canon.state.angleRad)
 
 proc rotateBack(canon: var Canon, rad = degToRad(canonRotationDeg)) =
   canon.rotate(-rad)
@@ -158,14 +158,14 @@ proc calcTrajectory(state: var ParabolaState) =
   let bullet = state.nextBullet()
   let gx = to(state.engine.gravity.x * state.engine.gravity.scale, float)
   let gy = to(state.engine.gravity.y * state.engine.gravity.scale, float)
-  let velocity = state.canon.state.velocity
+  let v = state.canon.state.velocity
 
   # Invert velocity y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVector(velocity.x, -velocity.y))
+  Body.setVelocity(bullet, jsVector(v.x, -v.y))
 
   state.canon.trajectory.setLen(0)
   var i = 0
-  while i < 10000:
+  while i < 6000:
     if bullet.position.y.to(int) > state.canvas.clientHeight - groundHeight:
       break
 
@@ -198,6 +198,12 @@ proc loadEvents(state: var ParabolaState) =
       let targetAngle = Vector.angle(canonPivot, state.mouse.position)
       state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
       state.calcTrajectory()
+
+      let distance = Vector.sub(canonPivot, state.mouse.position)
+      let magnitude = min(max(Vector.magnitude(distance).to(float), 63.0), 163.0)
+      echo magnitude
+      state.canon.state.speed = (canonInitialSpeed / 120) * magnitude
+      state.canon.state.velocity = speedToVelRad(state.canon.state.speed, state.canon.state.angleRad)
   )
 
   Events.on(state.engine, "collisionStart", proc(event: JsObject) = 
@@ -363,7 +369,7 @@ proc renderTextDiv*(state: ParabolaState): VNode =
     x = int bullet.position.x.to(float)
     y = state.normalizeY(int bullet.position.y.to(float), bullet.circleRadius.to(int))
     angle = normalizeAngle(bullet.angle.to(float))
-    speed = state.canon.state.speed
+    speed = int state.canon.state.speed
 
   buildHtml tdiv(id = "text", style = "".toCss):
     p(text r"\(t_f = \frac{2 \cdot v_i \cdot \sin(\theta)}{g}\)", style = "font-size: 50px;".toCss)
