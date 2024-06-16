@@ -15,6 +15,11 @@ type
     speed*: float
     velocity*: tuple[x, y: float]
 
+  CanonBase = object
+    x*, y*: int
+    img*: JsObject
+    isDragging*: bool
+
   Canon = object
     body*: JsObject
 
@@ -27,6 +32,16 @@ type
     isDragging*: bool # Is the canon being dragged
     status*: CanonStatus
     state*: CanonState
+
+    y*: int
+    pivot*: JsObject
+    base*: CanonBase
+    platform*: CanonPlatform
+    elevated*: bool
+
+  CanonPlatform = object
+    img*: JsObject
+    y*: int
 
   ParabolaState* = object
     engine*: JsObject
@@ -42,6 +57,10 @@ type
     canon*: Canon
     thingy*: JsObject
     ground*: JsObject
+
+    bounds*: JsObject
+    boundsScale*: JsObject
+    boundsScaleTarget*: float
 
 proc initCanonState(angleDeg: int, speed: float): CanonState = 
   let angleRad = degToRad(float angleDeg)
@@ -64,8 +83,9 @@ const
   canonWidth = 120
   canonHeight = 70
   canonX = canonWidth
-  canonRotationDeg = 10d
   canonInitialSpeed = 12
+  canonSpeedChange = 1
+  canonAngleChangeDeg = 5d
   canonTexture = "/public/img/canon.png"
   
   canonBaseImgPath = "/public/img/canonBase.png"
@@ -74,54 +94,8 @@ const
 
   velocityVectorScale = 9
 
-let
-  canonBaseImg = newImage()
-
-var
-  canonY, canonBaseX, canonBaseY: int
-  canonPivot: JsObject
-
-canonBaseImg.src = cstring canonBaseImgPath
-
 proc wrapObject(state: ParabolaState): JsObject = 
   JsObject{min: JsObject{x: 0, y: undefined}, max: JsObject{x: state.canvas.clientWidth, y: undefined}} # To avoid boilerplate
-
-proc onResize(state: var ParabolaState) = 
-  state.render.canvas.width = state.canvas.clientWidth
-  state.render.canvas.height = state.canvas.clientHeight
-
-  canonY = state.canvas.clientHeight - groundHeight - int(canonBaseImg.height.to(float) * 0.5)
-  canonPivot = JsObject{x: canonX  - (canonWidth / 2.5), y: canonY}
-
-  canonBaseX = canonPivot.x.to(int) - canonBaseImg.width.to(int) div 2
-  canonBaseY = state.canvas.clientHeight - groundHeight - canonBaseImg.height.to(int)
-
-  Body.setPosition(state.canon.body, JsObject{x: canonX, y: canonY})
-  Body.setPosition(state.ground, JsObject{x: state.canvas.clientWidth / 2, y: state.canvas.clientHeight - (groundHeight div 2)})
-
-  let wrap = state.wrapObject()
-
-  state.canon.bulletOptions.plugin = JsObject{wrap: wrap}
-
-  for bullet in state.canon.bullets:
-    bullet.plugin.wrap = wrap
-
-  state.thingy.plugin.wrap = wrap
-
-proc initParabolaState*(): ParabolaState = 
-  ParabolaState(canon: Canon(
-    bulletRadius: 20, state: initCanonState(0, canonInitialSpeed), 
-    bulletOptions: JsObject{
-      isStatic: false, frictionAir: 0, friction: 1, 
-    },
-  ))
-
-proc `bullet`(canon: Canon): JsObject = 
-  assert canon.currentBullet in canon.bullets.low..canon.bullets.high, &"Invalid bullet index {canon.currentBullet}"
-  canon.bullets[canon.currentBullet]
-
-#proc `bullet`(state: var CanonState): var JsObject = 
-#  state.bullets[state.currentBullet]
 
 ## Since a body's angle can be negative and can be higher than 360, this procedure makes it so it's always positive and inside 0..359
 proc normalizeAngle(rad: float): int =
@@ -133,22 +107,83 @@ proc normalizeAngle(rad: float): int =
   elif result > 0:
     result = 360 - result
 
-proc rotate(canon: var Canon, rad = degToRad(canonRotationDeg)) =
-  if normalizeAngle(canon.body.angle.to(float) + rad) notin 20..160:
+proc rotate(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = true) =
+  if limit and normalizeAngle(canon.body.angle.to(float) + rad) notin 20..160:
+    #echo &"Invalid angle ", (deg: normalizeAngle(canon.body.angle.to(float) + rad), rad: canon.body.angle.to(float) + rad)
     return
 
-  Body.rotate(canon.body, rad, canonPivot)
+  Body.rotate(canon.body, rad, canon.pivot)
 
   canon.state.angleDeg = normalizeAngle(canon.body.angle.to(float))
   canon.state.angleRad = degToRad(float canon.state.angleDeg)
   canon.state.velocity = speedToVelRad(canon.state.speed, canon.state.angleRad)
 
-proc rotateBack(canon: var Canon, rad = degToRad(canonRotationDeg)) =
-  canon.rotate(-rad)
+proc rotateBack(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = true) =
+  canon.rotate(-rad, limit)
+
+proc updatePos(canon: var Canon) =
+  let prevAngle = canon.body.angle.to(float) 
+  canon.rotate(-prevAngle, limit = false)
+  Body.setPosition(canon.body, JsObject{x: canonX, y: canon.y})
+  canon.rotate(prevAngle, limit = false)
+
+proc setSpeed(canon: var Canon, speed: float) = 
+  canon.state.speed = clamp(speed, 8.0..18.0)
+  canon.state.velocity = speedToVelRad(canon.state.speed, canon.state.angleRad)  
+
+proc onResize(state: var ParabolaState) = 
+  #echo "before: ", (canonX: canonX, state.canon.y: state.canon.y)
+  #jsonPrint state.canon.body
+
+  state.render.canvas.width = state.canvas.clientWidth
+  state.render.canvas.height = state.canvas.clientHeight
+
+  if not state.canon.elevated:
+    state.canon.y = state.canvas.clientHeight - groundHeight - int(state.canon.base.img.height.to(float) * 0.5)
+    state.canon.pivot = JsObject{x: canonX  - (canonWidth / 2.5), y: state.canon.y}
+
+    state.canon.base.x = state.canon.pivot.x.to(float).int - state.canon.base.img.width.to(float).int div 2
+    state.canon.base.y = state.canvas.clientHeight - groundHeight - state.canon.base.img.height.to(float).int
+  
+    state.canon.updatePos()
+
+  Body.setPosition(state.ground, JsObject{x: state.canvas.clientWidth / 2, y: state.canvas.clientHeight - (groundHeight div 2)})
+
+  let wrap = state.wrapObject()
+
+  state.canon.bulletOptions.plugin = JsObject{wrap: wrap}
+
+  for bullet in state.canon.bullets:
+    bullet.plugin.wrap = wrap
+
+  state.thingy.plugin.wrap = wrap
+
+  #echo "after: ", (canonX: canonX, state.canon.y: state.canon.y)
+  #jsonPrint state.canon.body
+
+proc initParabolaState*(): ParabolaState = 
+  result = ParabolaState(
+    boundsScale: JsObject{x: 1, y: 1},
+    boundsScaleTarget: 1, 
+    canon: Canon(
+      bulletRadius: 20, state: initCanonState(0, canonInitialSpeed), 
+      bulletOptions: JsObject{
+        isStatic: false, frictionAir: 0, friction: 1, 
+      }, base: CanonBase(img: newImage())
+  ))
+
+  result.canon.base.img.src = cstring canonBaseImgPath
+
+proc `bullet`(canon: Canon): JsObject = 
+  assert canon.currentBullet in canon.bullets.low..canon.bullets.high, &"Invalid bullet index {canon.currentBullet}"
+  canon.bullets[canon.currentBullet]
+
+#proc `bullet`(state: var CanonState): var JsObject = 
+#  state.bullets[state.currentBullet]
 
 proc nextBullet(state: var ParabolaState): JsObject = 
   result = Bodies.circle(
-    canonPivot.x, canonPivot.y, 
+    state.canon.pivot.x, state.canon.pivot.y, 
     state.canon.bulletRadius, state.canon.bulletOptions
   )
 
@@ -156,6 +191,8 @@ proc nextBullet(state: var ParabolaState): JsObject =
 
 proc calcTrajectory(state: var ParabolaState) =
   let bullet = state.nextBullet()
+  bullet.plugin = JsObject{wrap: state.wrapObject()}
+
   let gx = to(state.engine.gravity.x * state.engine.gravity.scale, float)
   let gy = to(state.engine.gravity.y * state.engine.gravity.scale, float)
   let v = state.canon.state.velocity
@@ -166,10 +203,15 @@ proc calcTrajectory(state: var ParabolaState) =
   state.canon.trajectory.setLen(0)
   var i = 0
   while i < 6000:
-    if bullet.position.y.to(int) > state.canvas.clientHeight - groundHeight:
+    if bullet.position.y.to(float).int > state.canvas.clientHeight - groundHeight:
       break
 
-    state.canon.trajectory.add JsVector JsObject{x: jsFloatToInt bullet.position.x, y: jsFloatToInt bullet.position.y}
+    MatterWrap.Body.wrap(bullet, bullet.plugin.wrap)
+
+    let x = bullet.position.x
+    let y = bullet.position.y
+
+    state.canon.trajectory.add JsVector JsObject{x: jsFloatToInt x, y: jsFloatToInt y}
 
     bullet.force.x += bullet.mass * toJs gx
     bullet.force.y += bullet.mass * toJs gy
@@ -182,28 +224,70 @@ proc calcTrajectory(state: var ParabolaState) =
 
 proc loadEvents(state: var ParabolaState) = 
   Events.on(state.mouseConstraint, "mousedown", proc(event: JsObject) = 
-    if Bounds.contains(state.canon.body.bounds, event.mouse.position).to(bool):
-      state.canon.isDragging = true
+    let baseBounds = JsObject{
+      min: JsObject{
+        x: state.canon.base.x.float / 1.3, y: state.canon.base.y.float
+      }, 
+      max: JsObject{
+        x: float(state.canon.base.x + state.canon.base.img.width.to(float).int) * 1.1, 
+        y: (state.canon.base.y + state.canon.base.img.height.to(float).int)
+      }, 
+    }
+
+    print baseBounds
+
+    if event.mouse.button == 0.toJs:
+      if Bounds.contains(baseBounds, event.mouse.position).to(bool):
+        state.canon.base.isDragging = true
+
+      elif Bounds.contains(state.canon.body.bounds, event.mouse.position).to(bool): 
+        state.canon.isDragging = true
   )
 
   Events.on(state.mouseConstraint, "mouseup", proc(event: JsObject) = 
     state.canon.isDragging = false
+    state.canon.base.isDragging = false
   )
+
+  state.mouse.element.addEventListener("wheel", proc(event: JsObject) = 
+    let wheelDelta = event.wheelDelta.to(float)
+    #let distance = Vector.sub(state.canon.pivot, state.mouse.position)
+    #let magnitude = Vector.magnitude(distance).to(float)
+    #state.canon.setSpeed(float int (canonInitialSpeed / 100) * magnitude)
+    if wheelDelta != 0:
+      state.canon.setSpeed(state.canon.state.speed + (wheelDelta / 120))
+      state.calcTrajectory()
+  )
+
+  #TODO: move afterUpdate to mousemove
 
   # Set event callbacks
   Events.on(state.engine, "afterUpdate", proc() =
     # So that it updates the formula values
     #if not kxi.surpressRedraws: redraw(kxi) # TODO: REALLY INEFFICIENT
-    if state.canon.isDragging:
-      let targetAngle = Vector.angle(canonPivot, state.mouse.position)
-      state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
+    if state.canon.base.isDragging:
+      let mousey = int state.mouse.position.y.to(float)# / 1.1
+      # It is canonMax even though it's the lowest point since matter counts y zero from the top
+      let canonMax = state.canvas.clientHeight - groundHeight - int(state.canon.base.img.height.to(float) * 0.5)
+      let canonMin = canonHeight + int(state.canon.base.img.height.to(float) * 0.5) # We add half the base height since the canon is always lower than the base
+      state.canon.y = clamp(mousey + int(state.canon.base.img.height.to(float) * 0.5), canonMin, canonMax)
+  
+      state.canon.elevated = state.canon.y != canonMax
+
+      state.canon.pivot = JsObject{x: canonX  - (canonWidth / 2.5), y: state.canon.y}
+
+      # It is baseMax even though it's the lowest point since matter counts y zero from the top
+      let baseMax = state.canvas.clientHeight - groundHeight - state.canon.base.img.height.to(float).int
+      state.canon.base.y = clamp(mousey, canonHeight, baseMax)
+      
+      state.canon.updatePos()
+
       state.calcTrajectory()
 
-      let distance = Vector.sub(canonPivot, state.mouse.position)
-      let magnitude = min(max(Vector.magnitude(distance).to(float), 63.0), 163.0)
-      echo magnitude
-      state.canon.state.speed = (canonInitialSpeed / 120) * magnitude
-      state.canon.state.velocity = speedToVelRad(state.canon.state.speed, state.canon.state.angleRad)
+    elif state.canon.isDragging:
+      let targetAngle = Vector.angle(state.canon.pivot, state.mouse.position)
+      state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
+      state.calcTrajectory()
   )
 
   Events.on(state.engine, "collisionStart", proc(event: JsObject) = 
@@ -213,14 +297,82 @@ proc loadEvents(state: var ParabolaState) =
           state.canon.status = csHit
           break
   )
+  Events.on(state.render, "beforeRender", proc() =
+    return
+    let mouse = state.mouseConstraint.mouse
+    var scaleFactor = mouse.wheelDelta.to(float) * -0.1
+
+    if state.boundsScaleTarget + scaleFactor >= 1 and 
+      (scaleFactor < 0 and state.boundsScale.x.to(float) >= 0.6 or 
+        scaleFactor > 0 and state.boundsScale.x.to(float) <= 1.4):
+      state.boundsScaleTarget += scaleFactor
+
+    # if scale has changed
+    if abs(state.boundsScale.x.to(float) - state.boundsScaleTarget) > 0.01:
+      # smoothly tween scale factor
+      scaleFactor = (state.boundsScaleTarget - state.boundsScale.x.to(float)) * 0.2
+      state.boundsScale.x += toJs scaleFactor
+      state.boundsScale.y += toJs scaleFactor
+
+      # scale the render bounds
+      state.render.bounds.max.x = state.render.bounds.min.x + state.render.options.width.toJs * state.boundsScale.x
+      state.render.bounds.max.y = state.render.bounds.min.y + state.render.options.height.toJs * state.boundsScale.y
+
+      # translate so zoom is from centre of view
+      let translate = JsObject{
+        x: state.render.options.width.to(float) * scaleFactor * -0.5,
+        y: state.render.options.height.to(float) * scaleFactor * -0.5
+      }
+
+      Bounds.translate(state.render.bounds, translate)
+
+      # update mouse
+      Mouse.setScale(mouse, state.boundsScale)
+      Mouse.setOffset(mouse, state.render.bounds.min)
+
+    # get vector from mouse relative to centre of viewport
+    var viewportCentre = JsObject{
+      x: state.render.options.width * toJs 0.5,
+      y: state.render.options.height * toJs 0.5
+    }
+    let deltaCentre = Vector.sub(mouse.absolute, viewportCentre)
+    let centreDist = Vector.magnitude(deltaCentre)
+
+    # translate the view if mouse has moved over 50px from the centre of viewport
+    if centreDist.to(float) > 50:
+      # create a vector to translate the view, allowing the user to control view speed
+      let direction = Vector.normalise(deltaCentre)
+      let speed = min(10, pow(centreDist.to(float) - 50, 2) * 0.0002)
+
+      let translate = Vector.mult(direction, speed)
+
+      # prevent the view moving outside the extens (bounds)
+      if to(state.render.bounds.min.x + translate.x < state.bounds.min.x, bool):
+        translate.x = state.bounds.min.x - state.render.bounds.min.x
+
+      if to(state.render.bounds.max.x + translate.x > state.bounds.max.x, bool):
+        translate.x = state.bounds.max.x - state.render.bounds.max.x
+
+      if to(state.render.bounds.min.y + translate.y < state.bounds.min.y, bool):
+        translate.y = state.bounds.min.y - state.render.bounds.min.y
+
+      if to(state.render.bounds.max.y + translate.y > state.bounds.max.y, bool):
+        translate.y = state.bounds.max.y - state.render.bounds.max.y
+
+      # move the view
+      Bounds.translate(state.render.bounds, translate)
+
+      # we must update the mouse too
+      Mouse.setOffset(mouse, state.render.bounds.min)
+  )
 
   Events.on(state.render, "afterRender", proc() =
     Render.startViewTransform(state.render)
 
     let ctx = state.render.context
 
-    if canonBaseImg.complete.to(bool):
-      ctx.drawImage(canonBaseImg, canonBaseX, canonBaseY)
+    if state.canon.base.img.complete.to(bool):
+      ctx.drawImage(state.canon.base.img, state.canon.base.x, state.canon.base.y)
 
     if state.canon.bullets.len > 0 and state.canon.status == csFlight:
       let pos = state.canon.bullet.position
@@ -234,7 +386,7 @@ proc loadEvents(state: var ParabolaState) =
       drawArrow(ctx, pos.x, pos.y, 
         pos.x + (state.canon.bullet.velocity.x * toJs velocityVectorScale), 
         pos.y,
-        toJs 4, toJs cstring"blue"
+        toJs 4, toJs cstring"lightblue"
       )
 
       #drawArrow(ctx, pos.x, pos.y, 
@@ -257,8 +409,8 @@ proc loadEvents(state: var ParabolaState) =
   ## Sort bodies by z-index/depth
   Events.on(state.engine.world, "afterAdd", proc() =
     state.engine.world.bodies = state.engine.world.bodies.to(seq[JsObject]).sorted(proc(a, b: JsObject): int =
-      let z1 = if a.zIndex.isNil: 0 else: a.zIndex.to(int)
-      let z2 = if b.zIndex.isNil: 0 else: b.zIndex.to(int)
+      let z1 = if a.zIndex.isNil: 0 else: a.zIndex.to(float).int
+      let z2 = if b.zIndex.isNil: 0 else: b.zIndex.to(float).int
       z1 - z2
     )
   )
@@ -291,8 +443,10 @@ proc load*(state: var ParabolaState) =
   state.runner = Runner.create(JsObject{delta: delta})
   Runner.run(state.runner, state.engine)
 
+  state.bounds = JsObject{min: JsObject{x: 0, y: 0}, max: JsObject{x: state.canvas.clientWidth.float * 0.6, y: state.canvas.clientHeight.float * 0.5}}
+
   # Create and add all bodies to the world
-  state.canon.body = Bodies.rectangle(canonX, canonY, canonWidth, canonHeight, JsObject{
+  state.canon.body = Bodies.rectangle(canonX, state.canon.y, canonWidth, canonHeight, JsObject{
     zIndex: 1, isStatic: true, collisionFilter: JsObject{mask: 0}, label: cstring"Canon",
     render: JsObject{sprite: JsObject{
       texture: cstring canonTexture, 
@@ -301,8 +455,8 @@ proc load*(state: var ParabolaState) =
   })
   #constraint = Constraint.create(JsObject{pointA: jsVector(0, 0), bodyB: canon})#, length: 30, stiffness: 0.1})
 
-  state.ground = Bodies.rectangle(state.canvas.clientWidth / 2, 
-    state.canvas.clientHeight - (groundHeight div 2), state.canvas.clientWidth * 1000, 
+  # onResize will set the correct position
+  state.ground = Bodies.rectangle(0, 0, state.canvas.clientWidth * 1000, 
     groundHeight, JsObject{zIndex: 10, isStatic: true, label: cstring"Ground"}
   ) # 350, 495, 1200
 
@@ -310,9 +464,12 @@ proc load*(state: var ParabolaState) =
 
   state.mouse = Mouse.create(state.canvas)
   state.mouseConstraint = MouseConstraint.create(state.engine, JsObject{mouse: state.mouse, collisionFilter: JsObject{mask: 0}})
+  state.render.mouse = state.mouse
 
   state.onResize()
   state.canon.rotateBack(degToRad(60d))
+
+  state.calcTrajectory()
 
   Composite.add(state.engine.world, toJs [state.canon.body, state.mouseConstraint,
     state.thingy,
@@ -331,12 +488,12 @@ proc reload*(state: var ParabolaState) =
   Engine.clear(state.engine)
   Render.stop(state.render)
   Runner.stop(state.runner)
-  state.canon.trajectory.setLen(0)
+  state = initParabolaState()#.canon.trajectory.setLen(0)
   state.load()
 
 ## Since matter measures y from the top of the screen, here we "normalize" it so that the 0 starts at the ground
 proc normalizeY(state: ParabolaState, y: int, height: int): int =
-  -y + (state.ground.position.y.to(int) - (groundHeight div 2) - height)
+  -y + (state.ground.position.y.to(float).int - (groundHeight div 2) - height)
 
 proc fireBullet(state: var ParabolaState) = 
   let bullet = state.nextBullet()
@@ -367,7 +524,7 @@ proc renderTextDiv*(state: ParabolaState): VNode =
     let bullet = state.canon.bullet
 
     x = int bullet.position.x.to(float)
-    y = state.normalizeY(int bullet.position.y.to(float), bullet.circleRadius.to(int))
+    y = state.normalizeY(int bullet.position.y.to(float), bullet.circleRadius.to(float).int)
     angle = normalizeAngle(bullet.angle.to(float))
     speed = int state.canon.state.speed
 
@@ -422,7 +579,7 @@ proc renderSimDiv*(state: var ParabolaState): VNode =
 
     br()
 
-    canvas(id = "canvas", style = fmt"width: 50vw; min-width: 300px; height: 50vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
+    canvas(id = "canvas", style = fmt"width: 100vw; min-width: 500px; height: 60vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
 
 proc render*(state: var ParabolaState): VNode =
@@ -457,7 +614,13 @@ proc addEventListeners*(state: var ParabolaState) =
     of "ArrowLeft":
       state.canon.rotateBack()
       state.calcTrajectory()
-    of "ArrowUp", " ":
+    of "ArrowUp":
+      state.canon.setSpeed(state.canon.state.speed + canonSpeedChange)
+      state.calcTrajectory()
+    of "ArrowDown":
+      state.canon.setSpeed(state.canon.state.speed - canonSpeedChange)
+      state.calcTrajectory()
+    of " ":
       state.fireBullet()
     of "Backspace":
       state.reload()

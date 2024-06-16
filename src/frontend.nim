@@ -45,7 +45,7 @@ var state = newState()
 # addTranslation(esCo, "s/0/")
 
 proc renderHome(params: Params): VNode =
-  navigateTo("/s/0")
+  navigateTo("/parabola")
   
   buildHtml(tdiv):
     text "Welcome to my grado project"

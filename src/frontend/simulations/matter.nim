@@ -4,6 +4,7 @@ import std/[jsffi]
 
 var
   Matter* {.importjs, nodecl.}: JsObject
+  MatterWrap* {.importjs, nodecl.}: JsObject
   Body*, Vector*, Engine*, Render*, Runner*, Bodies*, Bounds*, Events*, Composite*, MouseConstraint*, Mouse*, Constraint*: JsObject
 
 # This function is used to load Matter's aliases
