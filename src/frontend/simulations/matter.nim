@@ -24,42 +24,60 @@ proc loadMatterAliases*() =
   Constraint = Matter.Constraint
 
 type
-  JsVector* = distinct JsObject
+  Vec* = tuple[x, y: float]
 
 proc createEngine*(options: JsObject = nil): JsObject {.importjs: "Matter.Engine.create(#)".}
 proc createRender*(options: JsObject): JsObject {.importjs: "Matter.Render.create(#)".}
-proc jsVector*(x, y: SomeNumber): JsVector = JsVector JsObject{x: x, y: y}
-proc jsVector*(x, y: JsObject): JsVector = JsVector JsObject{x: x, y: y}
+proc jsVec*(x, y: SomeNumber or JsObject): JsObject = JsObject{x: x, y: y}
+proc jsVec*(v: Vec): JsObject = JsObject{x: v.x, y: v.y}
 
-proc `x`*(v: JsVector): float64 = 
-  JsObject(v).x.to(float64)
+proc setY*(body: JsObject, y: SomeNumber) = 
+  Body.setPosition(body, JsObject{x: body.position.x, y: y})
 
-proc `y`*(v: JsVector): float64 = 
-  JsObject(v).y.to(float64)
+proc setX*(body: JsObject, x: SomeNumber) = 
+  Body.setPosition(body, JsObject{y: body.position.y, x: x})
 
-proc toTuple*(v: JsVector): tuple[x, y: float64] = 
-  (x: v.x, y: v.y)
+proc setPos*(body: JsObject, x, y: SomeNumber or JsObject) = 
+  Body.setPosition(body, JsObject{x: x, y: y})
 
-proc `*`*(v1, v2: JsVector): JsVector =
-  JsVector JsObject{x: JsObject(v1).x * JsObject(v2).x, y: JsObject(v1).y * JsObject(v2).y}
+proc getX*(body: JsObject): float = 
+  body.position.x.to(float)
 
-proc `+`*(v1, v2: JsVector): JsVector =
-  JsVector JsObject{x: JsObject(v1).x + JsObject(v2).x, y: JsObject(v1).y + JsObject(v2).y}
+proc getY*(body: JsObject): float = 
+  body.position.y.to(float)
 
-proc `-`*(v1, v2: JsVector): JsVector =
-  JsVector JsObject{x: JsObject(v1).x - JsObject(v2).x, y: JsObject(v1).y - JsObject(v2).y}
+proc getPos*(body: JsObject): tuple[x, y: float] = 
+  (body.position.x.to(float), body.position.y.to(float))
 
-proc `/`*(v1, v2: JsVector): JsVector =
-  JsVector JsObject{x: JsObject(v1).x / JsObject(v2).x, y: JsObject(v1).y / JsObject(v2).y}
+proc vec*(v: JsObject): Vec = 
+  (x: v.x.to(float), y: v.y.to(float))
 
-proc `*`*(v1: JsVector, v2: float64): JsVector =
-  JsVector JsObject{x: JsObject(v1).x * v2.toJs, y: JsObject(v1).y * v2.toJs}
+proc vec*(x, y: JsObject): Vec = 
+  (x: x.to(float), y: y.to(float))
 
-proc `+`*(v1: JsVector, v2: float64): JsVector =
-  JsVector JsObject{x: JsObject(v1).x + v2.toJs, y: JsObject(v1).y + v2.toJs}
+proc vec*(x, y: float): Vec = 
+  (x: x, y: y)
 
-proc `-`*(v1: JsVector, v2: float64): JsVector =
-  JsVector JsObject{x: JsObject(v1).x - v2.toJs, y: JsObject(v1).y - v2.toJs}
+proc `*`*(v1, v2: Vec): Vec =
+  (x: v1.x * v2.x, y: v1.y * v2.y)
 
-proc `/`*(v1: JsVector, v2: float64): JsVector =
-  JsVector JsObject{x: JsObject(v1).x / v2.toJs, y: JsObject(v1).y / v2.toJs}
+proc `+`*(v1, v2: Vec): Vec =
+  (x: v1.x + v2.x, y: v1.y + v2.y)
+
+proc `-`*(v1, v2: Vec): Vec =
+  (x: v1.x - v2.x, y: v1.y - v2.y)
+
+proc `/`*(v1, v2: Vec): Vec =
+  (x: v1.x / v2.x, y: v1.y / v2.y)
+
+proc `*`*(v1: Vec, v2: float): Vec =
+  (x: v1.x * v2, y: v1.y * v2)
+
+proc `+`*(v1: Vec, v2: float): Vec =
+  (x: v1.x + v2, y: v1.y + v2)
+
+proc `-`*(v1: Vec, v2: float): Vec =
+  (x: v1.x - v2, y: v1.y - v2)
+
+proc `/`*(v1: Vec, v2: float): Vec =
+  (x: v1.x / v2, y: v1.y / v2)
