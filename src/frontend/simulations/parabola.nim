@@ -21,6 +21,10 @@ type
     isDragging*: bool # This is also true if the platform is being dragged
     dragOffset*: float
 
+  TrajectoryPoint = object
+      pos*, vec*: Vec
+      time*: int
+
   Canon = object
     platform*: CanonPlatform
     status*: CanonStatus
@@ -164,7 +168,7 @@ proc calcTrajectory(state: var ParabolaState) =
 
   state.canon.trajectory.setLen(0)
   var i = 0
-  while i < 6000:
+  while i < 60000:
     if bullet.position.y.to(float).int > state.canvas.clientHeight - groundHeight:
       break
 
@@ -177,10 +181,12 @@ proc calcTrajectory(state: var ParabolaState) =
 
     bullet.force.x += bullet.mass * toJs gx
     bullet.force.y += bullet.mass * toJs gy
-    Body.update(bullet)
+    Body.update(bullet, 30)
     bullet.force.x = 0
     bullet.force.y = 0
     bullet.torque = 0
+
+    print bullet.velocity
 
     inc i
 
@@ -317,7 +323,12 @@ proc loadEvents(state: var ParabolaState) =
   Events.on(state.engine, "afterUpdate", proc() =
     # So that it updates the formula values
     #if not kxi.surpressRedraws: redraw(kxi) # TODO: REALLY INEFFICIENT
-    discard
+    if state.canon.bullets.len > 0:
+      let bullet = state.canon.bullet
+      if state.canon.status == csFlight and bullet.collisionFilter.mask == 0.toJs and
+        bullet.position.y.to(float).int < state.canvas.clientHeight - groundHeight - bullet.circleRadius.to(float).int:
+
+        bullet.collisionFilter.mask = maskDefault
   )
 
   Events.on(state.engine, "collisionStart", proc(event: JsObject) = 
@@ -576,6 +587,7 @@ proc normalizeY(state: ParabolaState, y: int, height: int): int =
 
 proc fireBullet(state: var ParabolaState) = 
   let bullet = state.nextBullet()
+  bullet.collisionFilter.mask = 0
 
   Composite.add(state.engine.world, bullet)
   state.canon.bullets.add bullet

@@ -162,3 +162,5 @@ function drawArrow(ctx, fromx, fromy, tox, toy, arrowWidth, color){
 proc drawArrow*(ctx, fromx, fromy, tox, toy, arrowWidth, color: JsObject) {.importjs: "drawArrow(@)".} 
 
 proc newImage*(): JsObject {.importjs: "new Image()".}
+
+var maskDefault* {.importjs: "0xFFFFFFFF", nodecl.}: JsObject
