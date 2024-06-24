@@ -101,7 +101,7 @@ const
   canonPlatformTexture = "/public/img/canonPlatform.png"
 
   trajectoryStrokeStyle = "orange"
-  trajectoryLineWidth = 4
+  trajectoryLineWidth = 2
 
   velocityVectorScale = 9
 
@@ -434,27 +434,29 @@ proc onAfterRender(state: var ParabolaState, event: JsObject) =
         toJs 4, toJs cstring"#3FD0F6" # Neon blue
       )
 
-    #drawArrow(ctx, pos.x, pos.y, 
-    #  pos.x + (state.canon.bullet.velocity.x * toJs velocityVectorScale), 
-    #  pos.y + (state.canon.bullet.velocity.y * toJs velocityVectorScale), 
-    #  toJs 4, toJs cstring"white"
-    #)
+    #if state.canon.bullet.velocity.x.to(float).int != 0 and state.canon.bullet.velocity.y.to(float).int != 0:
+      #drawArrow(ctx, pos.x, pos.y, 
+      #  pos.x + (state.canon.bullet.velocity.x * toJs velocityVectorScale), 
+      #  pos.y + (state.canon.bullet.velocity.y * toJs velocityVectorScale), 
+      #  toJs 4, toJs cstring"white"
+      #)
 
   ctx.globalAlpha = 0.7
   
   # Draw trajetory
   if state.canon.trajectory.len > 0:
+    ctx.save()
+    let p0 = state.canon.trajectory[0]
+    ctx.moveTo(p0.pos.x, p0.pos.y)
+
     ctx.strokeStyle = cstring trajectoryStrokeStyle
     ctx.lineWidth = trajectoryLineWidth
-    ctx.moveTo(state.canon.trajectory[0].pos.x, state.canon.trajectory[0].pos.y)
 
     for p in state.canon.trajectory[1..^1]:
       ctx.lineTo(p.pos.x, p.pos.y)
-      #ctx.fillRect(p.pos.x, p.pos.y, 2, 2)
 
-    #let p = state.canon.trajectory[^1]
-    #ctx.lineTo(p.pos.x, p.pos.y)
     ctx.stroke()
+    ctx.restore()
 
   ctx.globalAlpha = 1
 
@@ -475,7 +477,7 @@ proc loadEvents(state: var ParabolaState) =
 
   state.mouse.element.addEventListener("wheel", proc(event: JsObject) = state.onWheel(event))
 
-  Events.on(state.mouseConstraint, "mouseup", proc(event: JsObject) = state.onMousemove(event))
+  Events.on(state.mouseConstraint, "mousemove", proc(event: JsObject) = state.onMousemove(event))
 
   Events.on(state.engine, "afterUpdate", proc(event: JsObject) = state.onAfterUpdate(event))
 
@@ -483,7 +485,7 @@ proc loadEvents(state: var ParabolaState) =
 
   Events.on(state.render, "beforeRender", proc(event: JsObject) = state.onBeforeRender(event))
 
-  Events.on(state.render, "afterRender", proc(event: JsObject) = state.onAfterUpdate(event))
+  Events.on(state.render, "afterRender", proc(event: JsObject) = state.onAfterRender(event))
 
   Events.on(state.engine.world, "afterAdd", proc(event: JsObject) = state.onAfterAdd(event))
 
