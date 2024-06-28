@@ -22,8 +22,8 @@ type
     dragOffset*: float
 
   TrajectoryPoint = object
-      pos*, vel*: Vec
-      time*: int
+    pos*, vel*: Vec
+    time*: int
 
   Canon = object
     platform*: CanonPlatform
@@ -32,6 +32,9 @@ type
     base*: CanonBase
 
     trajectory*: seq[TrajectoryPoint]
+    closestTrajectoryPoint*: int
+    trajectoryMiddlePoint*: int
+
     body*: JsObject
     pivot*: JsObject
     dragOffset*: JsObject
@@ -82,12 +85,12 @@ proc trajectoryPoint(pos, vel: Vec, time: int): TrajectoryPoint =
 const
   fps = 60
   delta = 1000 / fps # 60fps, 60 times in one second (1000 milliseconds)
-  timeScale = 0.6
+  timeScale = 0.5
 
   #canvasWidth = 700
   #canvasHeight = 500
 
-  groundHeight = 60
+  groundHeight = 80
 
   #canonWidth = 120
   #canonHeight = 70
@@ -102,8 +105,10 @@ const
 
   trajectoryStrokeStyle = "orange"
   trajectoryLineWidth = 2
+  trajectoryPointRadius = 7 # The trajectory point hovered by the mouse
 
   velocityVectorScale = 9
+  speedLimit = 8.0..20.0
 
 proc canonBaseImg(state: ParabolaState): JsObject = 
   state.render.textures[canonBaseTexture]
@@ -148,7 +153,7 @@ proc rotateBack(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = t
 #  canon.rotate(prevAngle, limit = false)
 
 proc setSpeed(canon: var Canon, speed: float) = 
-  canon.state.speed = clamp(speed, 8.0..18.0)
+  canon.state.speed = clamp(speed, speedLimit)
   canon.state.velocity = speedToVelRad(canon.state.speed, canon.state.angleRad)  
 
 proc nextBullet(state: var ParabolaState): JsObject = 
@@ -160,30 +165,69 @@ proc nextBullet(state: var ParabolaState): JsObject =
   Body.setAngle(result, state.canon.state.angleDeg)
 
 proc calcTrajectory(state: var ParabolaState) =
+  proc calcPos(time: float, iniPos, iniVel, gravity: Vec): Vec = 
+    result = vec(
+      iniPos.x + (time * iniVel.x), 
+      iniPos.y + (time * -iniVel.y) + (gravity.y * time * time) / 2
+    )
+    # Remove excess
+    if result.x < 0:
+      result.x -= (result.x.int div state.canvas.clientWidth).float * state.canvas.clientWidth.float
+      #echo result
+      result.x = state.canvas.clientWidth.float + result.x
+      #echo result, "-"
+    else:
+      result.x -= (result.x.int div state.canvas.clientWidth).float * state.canvas.clientWidth.float
+
   let bullet = state.nextBullet()
   bullet.plugin = JsObject{wrap: state.wrapObject()}
 
-  let gx = to(state.engine.gravity.x * state.engine.gravity.scale, float) * 280
-  let gy = to(state.engine.gravity.y * state.engine.gravity.scale, float) * 280
-  let xo = bullet.position.x.to(float)
-  let yo = bullet.position.y.to(float)
+  let g = vec(
+    to(state.engine.gravity.x * state.engine.gravity.scale, float) * 281.5,
+    to(state.engine.gravity.y * state.engine.gravity.scale, float) * 281.5
+  )
+  let iniPos = bullet.position.vec()
   let v = state.canon.state.velocity
+  let halfTime = v.y / g.y
+  let halfTimeInt = round(halfTime, 0).int
 
   # Invert velocity y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVec(v.x, -v.y))
+  #Body.setVelocity(bullet, jsVec(v.x, -v.y))
+
+  var t: float
+  var pos: Vec
 
   state.canon.trajectory.setLen(0)
-  for i in 0..<6000:
-    let t = i.float
-    let x = xo + (t * v.x)
-    let y = yo + (t * -v.y) + (gy * t * t) / 2
+  for i in countup(0, halfTime, 0.5):
+    t = i.float
+    pos = calcPos(t, iniPos, v, g)
 
-    if y.int > state.canvas.clientHeight - groundHeight:
+    #if pos.y.int > state.canvas.clientHeight - groundHeight:
+    #  break
+
+    state.canon.trajectory.add trajectoryPoint(pos, 
+      vec(v.x, v.y + g.y * t), t.int
+    )
+
+    if i == halfTime:
+      state.canon.trajectoryMiddlePoint = state.canon.trajectory.high
+
+  for i in countup(halfTime+0.5, halfTime*60, 0.5):
+    t = i.float
+    pos = calcPos(t, iniPos, v, g)
+
+    if pos.y.int > state.canvas.clientHeight - groundHeight:
       break
 
-    state.canon.trajectory.add trajectoryPoint(vec(x, y), 
-      vec(v.x, v.y + gy * t), t.int
+    state.canon.trajectory.add trajectoryPoint(pos, 
+      vec(v.x, v.y + g.y * t), t.int
     )
+
+  state.canon.trajectory.add trajectoryPoint(
+    vec(state.canon.trajectory[^1].pos.x, float state.canvas.clientHeight - groundHeight), 
+    vec(v.x, v.y + g.y * 2 * halfTime), t.int
+  )
+
 
     #MatterWrap.Body.wrap(bullet, bullet.plugin.wrap)
 
@@ -194,8 +238,8 @@ proc calcTrajectory(state: var ParabolaState) =
     #echo vec(jsFloatToInt x2, jsFloatToInt y2)
     #echo "---"
 
-    #bullet.force.x += bullet.mass * toJs gx
-    #bullet.force.y += bullet.mass * toJs gy
+    #bullet.force.x += bullet.mass * toJs g.x
+    #bullet.force.y += bullet.mass * toJs g.y
     #Body.update(bullet, 1)
     #bullet.force.x = 0
     #bullet.force.y = 0
@@ -254,8 +298,10 @@ proc initParabolaState*(): ParabolaState =
     canon: Canon(
       bulletRadius: 20, state: initCanonState(0, canonInitialSpeed), 
       bulletOptions: JsObject{
-        isStatic: false, frictionAir: 0, friction: 1, 
-      }, 
+        isStatic: false, frictionAir: 0, friction: 1, mass: 1,
+      },  
+      closestTrajectoryPoint: -1,
+      trajectoryMiddlePoint: -1,
       #base: CanonBase(img: newImage()), 
       #platform: CanonPlatform(img: newImage()), 
   ))
@@ -267,11 +313,24 @@ proc `bullet`(canon: Canon): JsObject =
   assert canon.currentBullet in canon.bullets.low..canon.bullets.high, &"Invalid bullet index {canon.currentBullet}"
   canon.bullets[canon.currentBullet]
 
-#proc `bullet`(state: var CanonState): var JsObject = 
-#  state.bullets[state.currentBullet]
+proc fireBullet(state: var ParabolaState) = 
+  let bullet = state.nextBullet()
+  bullet.collisionFilter.mask = 0
+
+  Composite.add(state.engine.world, bullet)
+  state.canon.bullets.add bullet
+  state.canon.currentBullet = state.canon.bullets.high
+
+  state.canon.status = csFlight
+
+  let velocity = state.canon.state.velocity
+
+  # Invert velocity y since matter's coordinates start from the top instead of the bottom
+  Body.setVelocity(bullet, jsVec(velocity.x, -velocity.y))
 
 proc onMousedown(state: var ParabolaState, event: JsObject) = 
-  if event.mouse.button == 0.toJs:
+  case event.mouse.button.to(int)
+  of 0:
     if Bounds.contains(state.canon.base.body.bounds, event.mouse.position).to(bool) or 
       Bounds.contains(state.canon.platform.body.bounds, event.mouse.position).to(bool):
       state.canon.base.isDragging = true
@@ -279,6 +338,9 @@ proc onMousedown(state: var ParabolaState, event: JsObject) =
     elif Bounds.contains(state.canon.body.bounds, event.mouse.position).to(bool): 
       state.canon.isDragging = true
       state.canon.dragOffset = Vector.angle(state.canon.pivot, state.mouse.position) - state.canon.body.angle
+  of 1:
+    state.fireBullet()
+  else: discard
 
 proc onMouseup(state: var ParabolaState, event: JsObject) = 
   state.canon.isDragging = false
@@ -289,6 +351,25 @@ proc onWheel(state: var ParabolaState, event: JsObject) =
   if wheelDelta != 0:
     state.canon.setSpeed(state.canon.state.speed + (wheelDelta / 120))
     state.calcTrajectory()
+
+proc calcClosestTrajectoryPoint(state: ParabolaState, point: Vec): int = 
+  ## Calculates the closest trajectory point to point
+  result = -1
+  var closestDistance = 0.0
+  var middlePointDistance = -1.0
+  for e, p in state.canon.trajectory:
+    let d = distance(p.pos, point)
+    if e == state.canon.trajectoryMiddlePoint:
+      middlePointDistance = d
+
+    if result < 0 or d < closestDistance:
+      closestDistance = d
+      result = e
+
+  if result != state.canon.trajectoryMiddlePoint and middlePointDistance < 20:
+    result = state.canon.trajectoryMiddlePoint
+  elif closestDistance > 40:
+    result = -1
 
 proc onMousemove(state: var ParabolaState, event: JsObject) = 
   let canonImg = state.canonImg or JsObject{width: 1, height: 1}
@@ -320,12 +401,15 @@ proc onMousemove(state: var ParabolaState, event: JsObject) =
 
     state.canon.pivot.y = canonY
     state.canon.rotate(canonPrevAngle, limit = false)
+    state.calcTrajectory()
 
   elif state.canon.isDragging:
     let targetAngle = Vector.angle(state.canon.pivot, state.mouse.position) - state.canon.dragOffset
     state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
+    state.calcTrajectory()
 
-  state.calcTrajectory()
+  else:
+    state.canon.closestTrajectoryPoint = state.calcClosestTrajectoryPoint(state.mouse.position.vec())
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
   # So that it updates the formula values
@@ -441,24 +525,56 @@ proc onAfterRender(state: var ParabolaState, event: JsObject) =
       #  toJs 4, toJs cstring"white"
       #)
 
-  ctx.globalAlpha = 0.7
-  
-  # Draw trajetory
-  if state.canon.trajectory.len > 0:
+  # Draw trajectory
+  let trajectory = state.canon.trajectory
+
+  if trajectory.len > 0:
     ctx.save()
-    let p0 = state.canon.trajectory[0]
+    ctx.globalAlpha = 0.7
+    ctx.beginPath()
+    let p0 = trajectory[0]
     ctx.moveTo(p0.pos.x, p0.pos.y)
 
     ctx.strokeStyle = cstring trajectoryStrokeStyle
     ctx.lineWidth = trajectoryLineWidth
-
-    for p in state.canon.trajectory[1..^1]:
-      ctx.lineTo(p.pos.x, p.pos.y)
+    for e, p in trajectory[1..^1]:
+      if abs(trajectory[e].pos.x - p.pos.x) > 100:
+        echo "a"
+        ctx.moveTo(p.pos.x, p.pos.y)
+      else:
+        ctx.lineTo(p.pos.x, p.pos.y)
 
     ctx.stroke()
+
+    ctx.globalAlpha = 1
+    ctx.fillStyle = cstring"#47D916"
+
+    let middlePos = trajectory[state.canon.trajectoryMiddlePoint].pos
+    ctx.beginPath()
+    ctx.arc(middlePos.x, middlePos.y, 
+      int(trajectoryPointRadius.float * 0.8), 0, 2 * PI
+    )
+    ctx.fill()
+
+    let lastPos = trajectory[^1].pos
+    ctx.beginPath()
+    ctx.arc(lastPos.x, lastPos.y, 
+      int(trajectoryPointRadius.float * 0.8), 0, 2 * PI
+    )
+    ctx.fill()
+
+    if not state.canon.isDragging and not state.canon.base.isDragging and 
+      state.canon.closestTrajectoryPoint in trajectory.low..trajectory.high:
+      #ctx.fillStyle = cstring"#48B324"
+      let pos = trajectory[state.canon.closestTrajectoryPoint].pos
+      ctx.beginPath()
+      ctx.arc(pos.x, pos.y, 
+        trajectoryPointRadius, 0, 2 * PI
+      )
+      ctx.fill()
+
     ctx.restore()
 
-  ctx.globalAlpha = 1
 
   Render.endViewTransform(state.render)
 
@@ -568,7 +684,7 @@ proc load*(state: var ParabolaState) =
   state.ground.xratio = 0.5
   state.ground.yratio = 1
 
-  state.thingy = Bodies.rectangle(state.canvas.clientWidth / 2, state.canvas.clientHeight.float * 0.6, 20, 80, JsObject{isStatic: false, label: cstring"Thingy", plugin: JsObject{wrap: state.wrapObject}})
+  state.thingy = Bodies.rectangle(state.canvas.clientWidth / 2, state.canvas.clientHeight.float * 0.6, 20, 80, JsObject{isStatic: false, label: cstring"Thing.y", plugin: JsObject{wrap: state.wrapObject}})
 
   state.mouse = Mouse.create(state.canvas)
   state.mouseConstraint = MouseConstraint.create(state.engine, JsObject{mouse: state.mouse, collisionFilter: JsObject{mask: 0}})
@@ -620,21 +736,6 @@ proc reload*(state: var ParabolaState) =
 ## Since matter measures y from the top of the screen, here we "normalize" it so that the 0 starts at the ground
 proc normalizeY(state: ParabolaState, y: int, height: int): int =
   -y + (state.ground.position.y.to(float).int - (groundHeight div 2) - height)
-
-proc fireBullet(state: var ParabolaState) = 
-  let bullet = state.nextBullet()
-  bullet.collisionFilter.mask = 0
-
-  Composite.add(state.engine.world, bullet)
-  state.canon.bullets.add bullet
-  state.canon.currentBullet = state.canon.bullets.high
-
-  state.canon.status = csFlight
-
-  let velocity = state.canon.state.velocity
-
-  # Invert velocity y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVec(velocity.x, -velocity.y))
 
 proc togglePause(state: var ParabolaState) = 
   if state.paused:
@@ -706,7 +807,7 @@ proc renderSimDiv*(state: var ParabolaState): VNode =
 
     br()
 
-    canvas(id = "canvas", style = fmt"width: 100vw; min-width: 500px; height: 60vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
+    canvas(id = "canvas", style = fmt"width: 100vw; min-width: 500px; height: 65vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
 
 proc render*(state: var ParabolaState): VNode =

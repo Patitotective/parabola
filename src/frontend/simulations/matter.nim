@@ -1,6 +1,6 @@
 ## This module implements some types, variables and procedures to ease the use of matter-js
 
-import std/[jsffi]
+import std/[jsffi, math]
 
 var
   Matter* {.importjs, nodecl.}: JsObject
@@ -81,3 +81,12 @@ proc `-`*(v1: Vec, v2: float): Vec =
 
 proc `/`*(v1: Vec, v2: float): Vec =
   (x: v1.x / v2, y: v1.y / v2)
+
+proc distance*(v1, v2: Vec): float = 
+  sqrt(abs((v2.x - v1.x)^2 + (v2.y - v1.y)^2))
+
+proc distanceInt*(v1, v2: Vec): int = 
+  int sqrt(abs((v2.x - v1.x)^2 + (v2.y - v1.y)^2))
+
+proc distanceSquared*(v1, v2: Vec): float = 
+  (v2.x - v1.x)^2 + (v2.y - v1.y)^2
