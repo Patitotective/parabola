@@ -70,17 +70,17 @@ proc `-`*(v1, v2: Vec): Vec =
 proc `/`*(v1, v2: Vec): Vec =
   (x: v1.x / v2.x, y: v1.y / v2.y)
 
-proc `*`*(v1: Vec, v2: float): Vec =
-  (x: v1.x * v2, y: v1.y * v2)
+proc `*`*(v1: Vec, a: float): Vec =
+  (x: v1.x * a, y: v1.y * a)
 
-proc `+`*(v1: Vec, v2: float): Vec =
-  (x: v1.x + v2, y: v1.y + v2)
+proc `+`*(v1: Vec, a: float): Vec =
+  (x: v1.x + a, y: v1.y + a)
 
-proc `-`*(v1: Vec, v2: float): Vec =
-  (x: v1.x - v2, y: v1.y - v2)
+proc `-`*(v1: Vec, a: float): Vec =
+  (x: v1.x - a, y: v1.y - a)
 
-proc `/`*(v1: Vec, v2: float): Vec =
-  (x: v1.x / v2, y: v1.y / v2)
+proc `/`*(v1: Vec, a: float): Vec =
+  (x: v1.x / a, y: v1.y / a)
 
 proc distance*(v1, v2: Vec): float = 
   sqrt(abs((v2.x - v1.x)^2 + (v2.y - v1.y)^2))
@@ -90,3 +90,25 @@ proc distanceInt*(v1, v2: Vec): int =
 
 proc distanceSquared*(v1, v2: Vec): float = 
   (v2.x - v1.x)^2 + (v2.y - v1.y)^2
+
+proc inverted*(v: Vec): Vec = 
+  vec(-v.x, -v.y)
+
+proc invertedY*(v: Vec): Vec = 
+  vec(v.x, -v.y)
+
+proc invertedX*(v: Vec): Vec = 
+  vec(-v.x, v.y)
+
+proc invert*(v: var Vec) = 
+  v.x = -v.x
+  v.y = -v.y
+
+proc invertY*(v: var Vec) = 
+  v.y = -v.y
+
+proc invertX*(v: var Vec) = 
+  v.x = -v.x
+
+proc both*(v: Vec, p: proc(a: float): float): Vec = 
+  vec(p(v.x), p(v.y))

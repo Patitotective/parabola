@@ -191,3 +191,23 @@ iterator countup*(a, b, step: float): float {.inline.} =
     res += step
 
   yield b
+
+const meterPerPx* = 60 # Meters per pixel
+
+# Si = International System of Units
+# delta is 1000/60 (16.666) milliseconds
+
+proc toSiMeters*(px: float): float = 
+  ## [px] -> [m]
+  px / meterPerPx
+
+proc toSiSpeed*(speed, delta: float): float = 
+  ## [px/delta] -> [m/s]
+  (speed / delta) * (1000 / meterPerPx)
+
+proc toSiAcceleration*(acceleration, delta: float): float = 
+  ## [px/delta²] -> [m/s²]
+  (acceleration / delta) * (1000^2 / meterPerPx)
+
+proc contains*[T: not int](a: openArray[T], index: int): bool = 
+  index in a.low..a.high
