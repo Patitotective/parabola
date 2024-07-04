@@ -195,11 +195,15 @@ iterator countup*(a, b, step: float): float {.inline.} =
 const meterPerPx* = 60 # Meters per pixel
 
 # Si = International System of Units
-# delta is 1000/60 (16.666) milliseconds
+# delta is the delay between frames/updates
 
-proc toSiMeters*(px: float): float = 
+proc toSiDistance*(px: float): float = 
   ## [px] -> [m]
   px / meterPerPx
+
+proc toSiTime*(t, delta: float): float = 
+  ## [delta] -> [s]
+  (t / delta) / 1000
 
 proc toSiSpeed*(speed, delta: float): float = 
   ## [px/delta] -> [m/s]

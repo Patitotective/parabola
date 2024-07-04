@@ -24,7 +24,6 @@ type
     ## pos is according to matter-js update body function
     ## acutalPos uses the high school level projectile motion formulas
     falsePos*, pos*, vel*: Vec
-    falseTime*: int
     time*: float
 
   Trajectory = object
@@ -131,13 +130,13 @@ const
   speedLimit = 8.0..19.0
   rotaTionLimit = 10.0..160.0
 
-proc toSi(state: CanonState): CanonState = 
+proc toSi(state: CanonState, delta = delta): CanonState = 
   result = CanonState(
     angleDeg: state.angleDeg, angleRad: state.angleRad,
     speed: state.speed.toSiSpeed(delta),
-    pos: state.pos.both(toSiMeters),
-    gravity: vec(state.gravity.x, 9.807)#state.gravity.both(
-    # proc(a: float): float = toSiAcceleration(a, delta))
+    pos: state.pos.both(toSiDistance),
+    #gravity: state.gravity.both(proc(a: float): float = toSiAcceleration(a, delta))
+    gravity: vec(state.gravity.x, 9.807)
   )
   result.vel = speedToVelRad(result.speed, state.angleRad)
 
@@ -191,6 +190,7 @@ proc calcTrajectory(state: var ParabolaState) =
   let bullet = state.nextBullet()
   #bullet.timeScale = timeScale
   bullet.plugin = JsObject{wrap: state.wrapObject()}
+  #`.=`(bullet, "_timeCorrection", false)
 
   let initialPos = bullet.position.vec()
   let initialState = state.canon.state
@@ -212,41 +212,45 @@ proc calcTrajectory(state: var ParabolaState) =
 
   # Highest point is actually lowest point since matter counts 0 from the top
   var highestPoint = (index: 0, y: state.canvas.clientHeight.float)
-
+  #print bullet.deltaTime
   state.trajectory.points.setLen(0)
   for i in countup(0, totalFalseTime.int * 4):
     if bullet.getY.int > state.canvas.clientHeight - groundHeight:
       break
 
     #MatterWrap.Body.wrap(bullet, bullet.plugin.wrap)
-
-    let falsePos = bullet.position.vec()
-
-    state.trajectory.points.add TrajectoryPoint(
-      falsePos: falsePos,
-      falseTime: i
+    var point = TrajectoryPoint(
+      falsePos: bullet.position.vec(),
+      #time: siTotalTime * ((i.float * delta) / 1000)
     )
+    with point:
+      time = (toSiDistance(point.falsePos.x - initialState.pos.x) / 
+        siInitialState.vel.x)
+      pos = siInitialState.calcPos(point.time)
+      vel = siInitialState.calcVel(point.time)
 
-    if falsePos.y < highestPoint.y:
-      highestPoint = (state.trajectory.points.high, falsePos.y)
+    state.trajectory.points.add point
+
+    if point.falsePos.y < highestPoint.y:
+      highestPoint = (state.trajectory.points.high, point.falsePos.y)
 
     bullet.force.x += bullet.mass * toJs initialState.gravity.x
     bullet.force.y += bullet.mass * toJs initialState.gravity.y
-    Body.update(bullet, delta * 8)
+    Body.update(bullet, delta)
     bullet.force.x = 0
     bullet.force.y = 0
     bullet.torque = 0
 
   # Here we use the displacement of the bullet position to estimate the time in each point
-  let xRange = abs(bullet.position.vec().x - initialPos.x)
+  #let xRange = abs(bullet.position.vec().x - initialPos.x)
 
-  for p in state.trajectory.points.mitems:
-    let siTime = ((abs(p.falsePos.x - initialPos.x) * siTotalTime) / xRange)
+  #for p in state.trajectory.points.mitems:
+  #  let siTime = ((abs(p.falsePos.x - initialPos.x) * siTotalTime) / xRange)
 
-    with p:
-      time = siTime
-      pos = siInitialState.calcPos(siTime)
-      vel = siInitialState.calcVel(siTime)
+  #  with p:
+  #    time = siTime
+  #    pos = siInitialState.calcPos(siTime)
+  #    vel = siInitialState.calcVel(siTime)
 
   state.trajectory.middlePoint = highestPoint.index
   #with state.trajectory.points[highestPoint.index]:
@@ -571,12 +575,12 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject, falseOne = true) =
     if falseOne:
       return p.falsePos
 
-    result = p.pos * 5.6#(meterPerPx / 14)
-    result.x = state.canon.pivot.x.to(float) + result.x
-    result.y = state.canon.pivot.y.to(float) - result.y #(state.canvas.clientHeight.float - (groundHeight.float + 
-      #trajectory.initialState.pos.y)) - result.y
-    
-    #result.y = state.canon.pivot.y.to(float) - result.y
+    result = vec(
+      state.canon.pivot.x.to(float) + p.pos.x,
+      state.canon.pivot.y.to(float) - (p.pos.y - 
+      trajectory.initialState.pos.y.toSiDistance())
+    )
+
   let p0 = trajectory.points[0]
 
   ctx.beginPath()
@@ -588,25 +592,14 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject, falseOne = true) =
     ctx.strokeStyle = cstring"#7991FA"
 
   ctx.lineWidth = trajectoryLineWidth
-  for e, p in trajectory.points[1..^1]:
-    # If the previous trajectory point is too far aways
+  for e, p in trajectory.points[0..^1]:
+    # If the previous trajectory point is too far away (because of wrapping)
     # Don't draw do lineTo but moveTo
     # e is the index of the previous trajectory point beacause ...points[1..^1]
     #if abs(trajectory.points[e].foo.x - p.foo.x) > 100:
     #  ctx.moveTo(p.foo.x, p.foo.y)
     #else:
     ctx.lineTo(p.foo.x, p.foo.y)
-  #let mp = trajectory.points[trajectory.middlePoint]
-  #ctx.lineTo(mp.foo.x, mp.foo.y)
-
-  #for e, p in trajectory.points[trajectory.middlePoint+1..^1]:
-  #  # If the previous trajectory point is too far aways
-  #  # Don't draw do lineTo but moveTo
-  #  # e is the index of the previous trajectory point beacause ...points[1..^1]
-  #  #if abs(trajectory.points[e].foo.x - p.foo.x) > 100:
-  #  #  ctx.moveTo(p.foo.x, p.foo.y)
-  #  #else:
-  #  ctx.lineTo(p.foo.x, p.foo.y)
 
   ctx.stroke()
 
