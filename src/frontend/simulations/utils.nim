@@ -184,13 +184,14 @@ proc isBetween*(c, a, b: Vec): bool =
 
   #return true
 
-iterator countup*(a, b, step: float): float {.inline.} =
-  var res = a
-  while res < b:
-    yield res
-    res += step
+iterator countthrough*(these: varargs[float], step: float): float {.inline.} =
+  var res = these[0]
+  for i in these[1..^1]:
+    while res < i:
+      yield res
+      res += step
 
-  yield b
+    yield i
 
 const meterPerPx* = 60 # Meters per pixel
 
