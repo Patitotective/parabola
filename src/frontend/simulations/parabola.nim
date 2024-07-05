@@ -13,7 +13,8 @@ type
     angleDeg*: float
     angleRad*: float
     speed*: float
-    pos*, vel*, gravity*: Vec
+    height*: float
+    vel*, gravity*: Vec
 
   CanonBase = object
     body*: JsObject
@@ -27,10 +28,10 @@ type
     time*: float
 
   Trajectory = object
-    points*: seq[TrajectoryPoint]
+    falsePoints*, points*: seq[TrajectoryPoint]
     middlePoint*: int
     closestPoint*: int # Closest point to the mouse
-    initialState*: CanonState
+    #initialState*: CanonState
     pinnedPoint*: int
     dragging*: bool # Is the pinned point being dragged
 
@@ -77,29 +78,29 @@ type
     boundsScaleTarget*: float
 
 proc initCanonState(angle: float, deg = false, speed: float, 
-  gravity: Vec, pos = vec(0, 0)): CanonState = 
+  gravity: Vec, height = 0.0): CanonState = 
   let angleDeg = if deg: angle else: radToDeg(angle)
   let angleRad = if deg: degToRad(angle) else: angle
 
   CanonState(angleDeg: angleDeg, angleRad: angleRad, 
     speed: speed, vel: speedToVelRad(speed, angleRad), 
-    gravity: gravity, pos: pos
+    gravity: gravity, height: height
   )
 
 # Projectile motion equations
 proc calcTotalTime*(initialState: CanonState): float = 
   (initialState.vel.y + sqrt(initialState.vel.y^2 + 
-    2 * initialState.gravity.y * initialState.pos.y)) / initialState.gravity.y
+    2 * initialState.gravity.y * initialState.height)) / initialState.gravity.y
 
 proc calcMaxRange*(initialState: CanonState): float = 
   initialState.vel.x * initialState.calcTotalTime()
 
 proc calcMaxHeight*(initialState: CanonState): float = 
-  initialState.pos.y + (initialState.vel.y^2 / (2*initialState.gravity.y))
+  initialState.height + (initialState.vel.y^2 / (2*initialState.gravity.y))
 
 proc calcPos*(initialState: CanonState, t: float): Vec = 
-  vec(initialState.pos.x + (t * initialState.vel.x), 
-    initialState.pos.y + (t * initialState.vel.y) - 
+  vec(t * initialState.vel.x, 
+    initialState.height + (t * initialState.vel.y) - 
       (initialState.gravity.y * t^2) / 2)
 
 proc calcVel*(initialState: CanonState, t: float): Vec = 
@@ -134,7 +135,7 @@ proc toSi(state: CanonState, delta = delta): CanonState =
   result = CanonState(
     angleDeg: state.angleDeg, angleRad: state.angleRad,
     speed: state.speed.toSiSpeed(delta),
-    pos: state.pos.both(toSiDistance),
+    height: state.height.toSiDistance(),
     #gravity: state.gravity.both(proc(a: float): float = toSiAcceleration(a, delta))
     gravity: vec(state.gravity.x, 9.807)
   )
@@ -194,15 +195,13 @@ proc calcTrajectory(state: var ParabolaState) =
 
   let initialPos = bullet.position.vec()
   let initialState = state.canon.state
-  state.trajectory.initialState = initialState
+  var initialStateB = initialState
+  initialStateB.gravity = initialStateB.gravity * 279#(1000/fps)
 
   let siInitialState = initialState.toSi()
   #echo siInitialState
 
-  let totalFalseTime = block: # Really aproximated calculation
-    var a = initialState
-    a.gravity = a.gravity * 15.6
-    a.calcTotalTime()
+  let totalFalseTime = initialStateB.calcTotalTime() # Really aproximated calculation
 
   let siMaxRange = siInitialState.calcMaxRange()
   let siTotalTime = siInitialState.calcTotalTime()
@@ -219,20 +218,13 @@ proc calcTrajectory(state: var ParabolaState) =
       break
 
     #MatterWrap.Body.wrap(bullet, bullet.plugin.wrap)
-    var point = TrajectoryPoint(
-      falsePos: bullet.position.vec(),
-      #time: siTotalTime * ((i.float * delta) / 1000)
+    let falsePos = bullet.position.vec()
+    state.trajectory.points.add TrajectoryPoint(
+      falsePos: falsePos,
     )
-    with point:
-      time = (toSiDistance(point.falsePos.x - initialState.pos.x) / 
-        siInitialState.vel.x)
-      pos = siInitialState.calcPos(point.time)
-      vel = siInitialState.calcVel(point.time)
 
-    state.trajectory.points.add point
-
-    if point.falsePos.y < highestPoint.y:
-      highestPoint = (state.trajectory.points.high, point.falsePos.y)
+    if falsePos.y < highestPoint.y:
+      highestPoint = (state.trajectory.points.high, falsePos.y)
 
     bullet.force.x += bullet.mass * toJs initialState.gravity.x
     bullet.force.y += bullet.mass * toJs initialState.gravity.y
@@ -240,6 +232,15 @@ proc calcTrajectory(state: var ParabolaState) =
     bullet.force.x = 0
     bullet.force.y = 0
     bullet.torque = 0
+
+  for i in countup(0.0, 100, 1):
+    var point: TrajectoryPoint
+    with point:
+      pos = initialStateB.calcPos(i * delta)
+      falsePos = point.pos
+      time = point.pos.x / initialStateB.vel.x
+      vel = initialStateB.calcVel(point.time)
+    state.trajectory.falsePoints.add point
 
   # Here we use the displacement of the bullet position to estimate the time in each point
   #let xRange = abs(bullet.position.vec().x - initialPos.x)
@@ -304,7 +305,7 @@ proc onResize(state: var ParabolaState) =
     state.canon.body.setPos canonX, canonY
     
     state.canon.pivot = JsObject{x: state.canon.base.body.position.x, y: canonY}
-    state.canon.state.pos.y = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
+    state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
 
     let platformY = (baseY * 1.02) + (canonPlatformImg.height.to(float) / 2)
     state.canon.platform.body.setY platformY
@@ -433,7 +434,7 @@ proc onMousemove(state: var ParabolaState, event: JsObject) =
     state.canon.body.setY canonY
 
     state.canon.pivot.y = canonY
-    state.canon.state.pos.y = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
+    state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
     state.canon.rotate(canonPrevAngle, limit = false)
     state.calcTrajectory()
 
@@ -569,8 +570,7 @@ proc drawVelocityArrows(state: ParabolaState, ctx: JsObject) =
       #  toJs 4, toJs cstring"white"
       #)
 
-proc drawTrajectory(state: ParabolaState, ctx: JsObject, falseOne = true) = 
-  let trajectory = state.trajectory
+proc drawTrajectory(state: ParabolaState, ctx: JsObject, points: seq[TrajectoryPoint], falseOne = true) = 
   proc foo(p: TrajectoryPoint): Vec = 
     if falseOne:
       return p.falsePos
@@ -578,10 +578,10 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject, falseOne = true) =
     result = vec(
       state.canon.pivot.x.to(float) + p.pos.x,
       state.canon.pivot.y.to(float) - (p.pos.y - 
-      trajectory.initialState.pos.y.toSiDistance())
+        state.canon.state.height)
     )
 
-  let p0 = trajectory.points[0]
+  let p0 = points[0]
 
   ctx.beginPath()
   ctx.moveTo(p0.foo.x, p0.foo.y)
@@ -592,11 +592,11 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject, falseOne = true) =
     ctx.strokeStyle = cstring"#7991FA"
 
   ctx.lineWidth = trajectoryLineWidth
-  for e, p in trajectory.points[0..^1]:
+  for e, p in points[0..^1]:
     # If the previous trajectory point is too far away (because of wrapping)
     # Don't draw do lineTo but moveTo
     # e is the index of the previous trajectory point beacause ...points[1..^1]
-    #if abs(trajectory.points[e].foo.x - p.foo.x) > 100:
+    #if abs(points[e].foo.x - p.foo.x) > 100:
     #  ctx.moveTo(p.foo.x, p.foo.y)
     #else:
     ctx.lineTo(p.foo.x, p.foo.y)
@@ -616,8 +616,8 @@ proc onAfterRender(state: var ParabolaState, event: JsObject) =
     ctx.save()
 
     ctx.globalAlpha = 0.7
-    state.drawTrajectory(ctx)
-    state.drawTrajectory(ctx, false)
+    #state.drawTrajectory(ctx, trajectory.points)
+    state.drawTrajectory(ctx, trajectory.falsePoints)
     ctx.globalAlpha = 1
 
     # Draw points
@@ -842,12 +842,12 @@ proc togglePause(state: var ParabolaState) =
   state.paused = not state.paused
 
 proc renderTopDiv*(state: ParabolaState): VNode =
-  var siInitialState = state.trajectory.initialState.toSi()
+  var siInitialState = state.canon.state#.toSi()
  
   buildHtml tdiv(id = "text", style = "".toCss):
     #p(text r"\(t_f = \frac{2 \cdot v_i \cdot \sin(\theta)}{g}\)", style = "font-size: 50px;".toCss)
 
-    p(text &"h = {siInitialState.pos.y:.1f}")
+    p(text &"h = {siInitialState.height:.1f}")
     p(text &"α = {siInitialState.angleDeg:.0f}")
 
     p(text &"Vi = {siInitialState.speed:.1f}")
