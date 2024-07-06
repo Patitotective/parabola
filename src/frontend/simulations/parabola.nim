@@ -113,22 +113,29 @@ proc calcVel*(initialState: CanonState, t: float): Vec =
   vec(initialState.vel.x, 
     initialState.vel.y - (initialState.gravity.y * t))
 
-proc calcTime*(initialState: CanonState, y: float): float = 
-  -initialState.vel.y + sqrt(initialState.vel.y^2 - 
-    (2 * initialState.gravity.y * initialState.height) + (2 * 
-      initialState.gravity.y * y)) / initialState.gravity.y
-  #-initialState.vel.y - sqrt(initialState.vel.y^2 - 
-  #  (2 * initialState.gravity.y * initialState.height) + (2 * 
-  #    initialState.gravity.y * y)) / initialState.gravity.y
+# Don't use, too inaccurate
+#proc calcTime*(initialState: CanonState, y: float): float = 
+#  -initialState.vel.y + sqrt(initialState.vel.y^2 - 
+#    (2 * initialState.gravity.y * initialState.height) + (2 * 
+#      initialState.gravity.y * y)) / initialState.gravity.y
+#  #-initialState.vel.y - sqrt(initialState.vel.y^2 - 
+#  #  (2 * initialState.gravity.y * initialState.height) + (2 * 
+#  #    initialState.gravity.y * y)) / initialState.gravity.y
+
 const
   fps = 60
-  timeScale = 0.4
+  timeScale = 0.08
   delta = (1000 / fps) * timeScale # 60fps, 60 times in one second (1000 milliseconds)
+
+  # For some reason if you use the projectile motion formulas with matter-js
+  # gravity you get a different trajectory, you instead have to multiply
+  # matter-js gravity by this proportion to make it work :shrug:
+  gravityProportion = 279
 
   groundHeight = 80
 
   canonXRatio = 0.2 # Ratio
-  canonInitialSpeed = 10
+  canonInitialSpeed = 50
   canonSpeedChange = 1
   canonAngleChangeDeg = 5d
 
@@ -138,11 +145,11 @@ const
 
   trajectoryStrokeStyle = "orange"
   trajectoryLineWidth = 2
-  trajectoryPointRadius = 7 # The trajectory point hovered by the mouse
+  trajectoryPointRadius = 7 # The radius of the trajectory point hovered by the mouse
 
-  velVectorScale = 9 # Scale of the velocity arrows
-  speedLimit = 8.0..19.0
-  rotaTionLimit = 10.0..160.0
+  velVectorScale = 2 # Scale of the velocity arrows
+  speedLimit = 20.0..100.0
+  rotationLimit = 10.0..170.0
 
 proc getPos(state: ParabolaState, p: TrajectoryPoint): Vec = 
   ## Converts p.pos into matter-js coordinates
@@ -156,8 +163,8 @@ proc toSi(state: CanonState, delta = delta): CanonState =
     angleDeg: state.angleDeg, angleRad: state.angleRad,
     speed: state.speed.toSiSpeed(delta),
     height: state.height.toSiDistance(),
-    #gravity: state.gravity.both(proc(a: float): float = toSiAcceleration(a, delta))
-    gravity: vec(state.gravity.x, 9.807)
+    gravity: state.gravity.both(proc(a: float): float = toSiAcceleration(a, delta))
+    #gravity: vec(state.gravity.x, 9.807)
   )
   result.vel = speedToVelRad(result.speed, state.angleRad)
 
@@ -184,8 +191,22 @@ proc normalizeAngle(rad: float): float =
     result = 360 - result
 
 proc rotate(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = true) =
-  if limit and normalizeAngle(canon.body.angle.to(float) + rad) notin rotationLimit:
-    return
+  var rad = rad
+  if limit:
+    let desiredAngleDeg = normalizeAngle(canon.body.angle.to(float) + rad)#clamp(
+      #normalizeAngle(canon.body.angle.to(float) + rad), rotationLimit)
+    if desiredAngleDeg notin rotationLimit:
+      let lowerLimit = 
+        if desiredAngleDeg > 180: 360.0 + rotationLimit.a
+        else: rotationLimit.a
+
+      if abs(desiredAngleDeg - lowerLimit) < 
+        abs(desiredAngleDeg - rotationLimit.b):
+        rad = degToRad(normalizeAngle(canon.body.angle.to(float)) - rotationLimit.a)
+      else:
+        rad = degToRad(normalizeAngle(canon.body.angle.to(float)) - rotationLimit.b)
+
+    #rad = degToRad(normalizeAngle(canon.body.angle.to(float)) - desiredAngleDeg)
 
   Body.rotate(canon.body, rad, canon.pivot)
 
@@ -214,44 +235,20 @@ proc calcTrajectory(state: var ParabolaState) =
   #`.=`(bullet, "_timeCorrection", false)
 
   var initialState = state.canon.state
-  initialState.gravity = initialState.gravity * 279
+  initialState.gravity = initialState.gravity * gravityProportion
 
   let totalTime = initialState.calcTotalTime()
   state.trajectory.totalTime = totalTime
 
-  # Invert vel.y since matter's coordinates start from the top instead of the bottom
-  #Body.setVelocity(bullet, jsVec(initialState.vel.x, -initialState.vel.y))
-
   var highest = (index: 0, y: 0.0)
 
-  #state.trajectory.falsePoints.setLen(0)
-  #for i in countup(0, totalFalseTime.int * 4):
-  #  if bullet.getY.int > state.canvas.clientHeight - groundHeight:
-  #    break
-
-  #  #MatterWrap.Body.wrap(bullet, bullet.plugin.wrap)
-  #  let falsePos = bullet.position.vec()
-  #  state.trajectory.falsePoints.add TrajectoryPoint(
-  #    falsePos: falsePos,
-  #  )
-
-  #  if falsePos.y < highest.y:
-  #    highest = (state.trajectory.falsePoints.high, falsePos.y)
-
-  #  bullet.force.x += bullet.mass * toJs initialState.gravity.x
-  #  bullet.force.y += bullet.mass * toJs initialState.gravity.y
-  #  Body.update(bullet, delta)
-  #  bullet.force.x = 0
-  #  bullet.force.y = 0
-  #  bullet.torque = 0
-
   state.trajectory.points.setLen(0)
-  for i in countthrough(0.0, totalTime, step = 0.1):
+  for t in countthrough(0.0, totalTime, step = delta / 50):
     var point: TrajectoryPoint
     with point:
-      time = i
-      pos = initialState.calcPos(i)
-      vel = initialState.calcVel(i)
+      time = t
+      pos = initialState.calcPos(t)
+      vel = initialState.calcVel(t)
 
     state.trajectory.points.add point
 
@@ -259,22 +256,22 @@ proc calcTrajectory(state: var ParabolaState) =
       highest = (state.trajectory.points.high, point.pos.y)
 
   state.trajectory.highestPoint = highest.index
+  
   var highestPoint = state.trajectory.points[highest.index]
+  var initialStateB = initialState
+  initialStateB.height = 0
 
   highestPoint.pos.y = initialState.calcMaxHeight()
-  highestPoint.time = initialState.calcTime(highestPoint.pos.y)
+  highestPoint.time = initialStateB.calcTotalTime() / 2
   highestPoint.pos.x = initialState.calcX(highestPoint.time)
   highestPoint.vel.y = 0
-  
-  echo (v: highestPoint.vel.y, v2: initialState.calcVel(highestPoint.time).y) 
-  echo (y: highest.y, v2: highestPoint.pos.y) 
 
   state.trajectory.points[highest.index] = highestPoint
 
-  #with state.trajectory.points[^1]:
-  #  pos = vec(siMaxRange, 0)
-  #  vel = siInitialState.calcVel(siTotalTime) #siInitialState.vel
-  #  time = siTotalTime
+  with state.trajectory.points[^1]:
+    pos = vec(initialState.calcMaxRange(), 0)
+    #vel = siInitialState.calcVel(siTotalTime) #siInitialState.vel
+    time = totalTime
 
   if not kxi.surpressRedraws: redraw(kxi)
 
@@ -328,9 +325,9 @@ proc initParabolaState*(): ParabolaState =
     boundsScaleTarget: 1, 
     canon: Canon(
       bulletRadius: 20, state: initCanonState(0, deg = true, 
-        canonInitialSpeed, gravity = vec(0, 0.001)), 
+        canonInitialSpeed, gravity = vec(0, 9.807 / gravityProportion)), 
       bulletOptions: JsObject{
-        isStatic: false, frictionAir: 0, friction: 1, mass: 1,
+        isStatic: false, frictionAir: 0, friction: 1,
       }),
     trajectory: Trajectory(  
       closestPoint: -1, highestPoint: -1, pinnedPoint: -1)
@@ -387,6 +384,9 @@ proc onMousedown(state: var ParabolaState, event: JsObject) =
       state.calcClosestTrajectoryPoint(state.mouse.position.vec(), minRange = true)
       if state.trajectory.closestPoint in state.trajectory.points:
         state.trajectory.dragging = true
+        if not kxi.surpressRedraws: redraw(kxi)
+      elif state.trajectory.pinnedPoint in state.trajectory.points:
+        state.trajectory.pinnedPoint = -1
         if not kxi.surpressRedraws: redraw(kxi)
 
     elif Bounds.contains(state.canon.base.body.bounds, state.mouse.position).to(bool) or 
@@ -469,7 +469,7 @@ proc onMouseleave(state: var ParabolaState, event: JsObject) =
 proc onWheel(state: var ParabolaState, event: JsObject) = 
   let wheelDelta = event.wheelDelta.to(float)
   if wheelDelta != 0:
-    state.canon.setSpeed(state.canon.state.speed + (wheelDelta / 120))
+    state.canon.setSpeed(state.canon.state.speed + (wheelDelta / 50))
     state.calcTrajectory()
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
