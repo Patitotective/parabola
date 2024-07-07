@@ -193,26 +193,32 @@ iterator countthrough*(these: varargs[float], step: float): float {.inline.} =
 
     yield i
 
-const meterPerPx* = 60 # Meters per pixel
-
-# Si = International System of Units
-# delta is the delay between frames/updates
-
-proc toSiDistance*(px: float): float = 
-  ## [px] -> [m]
-  px / meterPerPx
-
-proc toSiTime*(t, delta: float): float = 
-  ## [delta] -> [s]
-  (t / delta) / 1000
-
-proc toSiSpeed*(speed, delta: float): float = 
-  ## [px/delta] -> [m/s]
-  (speed / delta) * (1000 / meterPerPx)
-
-proc toSiAcceleration*(acceleration, delta: float): float = 
-  ## [px/delta²] -> [m/s²]
-  (acceleration / delta) * (1000^2 / meterPerPx)
-
 proc contains*[T: not int](a: openArray[T], index: int): bool = 
   index in a.low..a.high
+
+# MU = My Unit system
+ #we do some adjustments so the numbers aren't so big...
+const muMeterFactor* = 10
+
+proc toMuDistance*(m: float): float = 
+  m / muMeterFactor
+
+#proc toSiTime*(t, delta: float): float = 
+#  ## [delta] -> [s]
+#  (t / delta) / 1000
+
+proc toMuSpeed*(speed: float): float = 
+  speed / muMeterFactor
+
+proc toMuAcceleration*(acceleration: float): float = 
+  acceleration / muMeterFactor
+
+proc fromMuDistance*(m: float): float = 
+  m * muMeterFactor
+
+proc fromMuSpeed*(speed: float): float = 
+  speed * muMeterFactor
+
+proc fromMuAcceleration*(acceleration: float): float = 
+  acceleration * muMeterFactor
+
