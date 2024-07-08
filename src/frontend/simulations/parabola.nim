@@ -51,7 +51,6 @@ type
     currentBullet*: int
     bulletRadius*: int
 
-    #x*, y*: int
     elevated*: bool
     dragging*: bool # Is the canon being dragged
 
@@ -133,13 +132,13 @@ const
   # For some reason if you use the projectile motion formulas with matter-js
   # gravity you get a different trajectory, you instead have to multiply
   # matter-js gravity by this proportion to make it work :shrug:
-  gravityFactor = 279
+  gravityFactor = 279.0
 
-  groundHeight = 80
+  groundHeight = 80.0
 
   canonXRatio = 0.2 # Ratio
   canonInitialSpeed = 250.0
-  canonSpeedChange = 1
+  canonSpeedChange = 1.0
   canonAngleChangeDeg = 3.0
 
   canonTexture = "/public/img/canon.png"
@@ -150,9 +149,9 @@ const
   trajectoryLineWidth = 2
   trajectoryPointRadius = 7 # The radius of the trajectory point hovered by the mouse
 
-  velVectorScale = 1 # Scale of the velocity arrows
-  speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*2)
-  rotationLimit = 10.0..170.0
+  velVectorScale = canonInitialSpeed * 0.002 # Scale of the velocity arrows
+  speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*1.5)
+  angleLowerLimit = 24.0 # Lower limit when canon is too close to the floor
 
 proc getPos(state: ParabolaState, p: TrajectoryPoint): Vec = 
   ## Converts p.pos into matter-js coordinates
@@ -197,11 +196,17 @@ proc normalizeAngle(rad: float): float =
   elif result > 0:
     result = 360 - result
 
-proc rotate(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = true) =
+proc rotateCanon(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), limit = true) =
   var rad = rad
+  let canonImg = state.canonImg or JsObject{width: 1, height: 1}
   if limit:
-    let desiredAngleDeg = normalizeAngle(canon.body.angle.to(float) + rad)#clamp(
-      #normalizeAngle(canon.body.angle.to(float) + rad), rotationLimit)
+    let rotationLimit = 
+      if state.canon.state.height > canonImg.height.to(float):
+        0.0..180.0
+      else:
+        angleLowerLimit..(180.0-angleLowerLimit)
+
+    let desiredAngleDeg = normalizeAngle(state.canon.body.angle.to(float) + rad)
     if desiredAngleDeg notin rotationLimit:
       let lowerLimit = 
         if desiredAngleDeg > 180: 360.0 + rotationLimit.a
@@ -209,20 +214,21 @@ proc rotate(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = true)
 
       if abs(desiredAngleDeg - lowerLimit) < 
         abs(desiredAngleDeg - rotationLimit.b):
-        rad = degToRad(normalizeAngle(canon.body.angle.to(float)) - rotationLimit.a)
+        rad = degToRad(normalizeAngle(state.canon.body.angle.to(float)) - 
+          rotationLimit.a)
       else:
-        rad = degToRad(normalizeAngle(canon.body.angle.to(float)) - rotationLimit.b)
+        rad = degToRad(normalizeAngle(state.canon.body.angle.to(float)) - 
+          rotationLimit.b)
 
-    #rad = degToRad(normalizeAngle(canon.body.angle.to(float)) - desiredAngleDeg)
+  Body.rotate(state.canon.body, rad, state.canon.pivot)
 
-  Body.rotate(canon.body, rad, canon.pivot)
+  state.canon.state.angleDeg = normalizeAngle(state.canon.body.angle.to(float))
+  state.canon.state.angleRad = degToRad(float state.canon.state.angleDeg)
+  state.canon.state.vel = speedToVelRad(state.canon.state.speed, 
+    state.canon.state.angleRad)
 
-  canon.state.angleDeg = normalizeAngle(canon.body.angle.to(float))
-  canon.state.angleRad = degToRad(float canon.state.angleDeg)
-  canon.state.vel = speedToVelRad(canon.state.speed, canon.state.angleRad)
-
-proc rotateBack(canon: var Canon, rad = degToRad(canonAngleChangeDeg), limit = true) =
-  canon.rotate(-rad, limit)
+proc rotateCanonBack(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), limit = true) =
+  state.rotateCanon(-rad, limit)
 
 proc setSpeed(canon: var Canon, speed: float) = 
   canon.state.speed = clamp(speed, speedLimit)
@@ -234,6 +240,7 @@ proc nextBullet(state: var ParabolaState): JsObject =
     state.canon.bulletRadius, state.canon.bulletOptions
   )
   Body.setAngle(result, state.canon.state.angleDeg)
+  Body.setInertia(result, Infinity)
 
 proc calcTrajectory(state: var ParabolaState) =
   var initialState = state.canon.state
@@ -302,7 +309,7 @@ proc onResize(state: var ParabolaState, trajectory = true) =
 
   if not state.canon.elevated:# and not canonBaseImg.isUndefined and not canonPlatformImg.isUndefined:
     let canonPrevAngle = state.canon.body.angle.to(float) 
-    state.canon.rotate(-canonPrevAngle, limit = false)
+    state.rotateCanon(-canonPrevAngle, limit = false)
 
     let baseY = state.canvas.clientHeight.float - groundHeight.float + (canonBaseImg.height.to(float) * 0.2)
     state.canon.base.body.setY baseY
@@ -318,7 +325,7 @@ proc onResize(state: var ParabolaState, trajectory = true) =
     let platformY = (baseY * 1.02) + (canonPlatformImg.height.to(float) / 2)
     state.canon.platform.body.setY platformY
 
-    state.canon.rotate(canonPrevAngle, limit = false)
+    state.rotateCanon(canonPrevAngle, limit = false)
     if trajectory:
       state.calcTrajectory()
 
@@ -383,8 +390,10 @@ proc initParabolaState*(): ParabolaState =
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
   if state.canon.bullets.len > 0:
     let bullet = state.canon.bullet
-    if state.canon.status == csFlight and bullet.collisionFilter.mask == 0.toJs and
-      bullet.position.y.to(float).int < state.canvas.clientHeight - groundHeight - bullet.circleRadius.to(float).int:
+    if state.canon.status == csFlight and 
+      bullet.collisionFilter.mask == 0.toJs and
+      bullet.position.y.to(float) < state.canvas.clientHeight.float - 
+        groundHeight - (bullet.circleRadius.to(float)):
 
       bullet.collisionFilter.mask = maskDefault
 
@@ -548,6 +557,14 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject) =
     )
     ctx.fill()
 
+proc drawHeight(state: ParabolaState, ctx: JsObject) = 
+  if not state.canon.pivot.isNull:
+    ctx.font = cstring"20px serif"
+    ctx.fillStyle = cstring"white"
+    ctx.fillText(cstring &"{state.canon.state.height.toMuDistance:.1f}m", 
+      state.canon.pivot.x.to(float) - 110, 
+      state.canvas.clientHeight.float - groundHeight - 10)
+
 proc onAfterRender(state: var ParabolaState, event: JsObject) = 
   Render.startViewTransform(state.render)
   let ctx = state.render.context
@@ -565,6 +582,10 @@ proc onAfterRender(state: var ParabolaState, event: JsObject) =
     ctx.globalAlpha = 1
 
     ctx.restore()
+
+  ctx.save()
+  state.drawHeight(ctx)
+  ctx.restore()
 
   Render.endViewTransform(state.render)
 
@@ -630,7 +651,7 @@ proc loadEvents(state: var ParabolaState) =
 
       if state.canon.base.dragging:
         let canonPrevAngle = state.canon.body.angle.to(float) 
-        state.canon.rotate(-canonPrevAngle, limit = false)
+        state.rotateCanon(-canonPrevAngle, limit = false)
 
         let mousey = state.mouse.position.y.to(float) + state.canon.base.dragOffset
 
@@ -653,12 +674,17 @@ proc loadEvents(state: var ParabolaState) =
 
         state.canon.pivot.y = canonY
         state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
-        state.canon.rotate(canonPrevAngle, limit = false)
+        state.rotateCanon(canonPrevAngle, limit = false)
+
+        if state.canon.state.height <= canonImg.height.to(float):
+          state.rotateCanon(degToRad(angleLowerLimit) - 
+            state.canon.body.angle.to(float))
+
         state.calcTrajectory()
 
       elif state.canon.dragging:
         let targetAngle = Vector.angle(state.canon.pivot, state.mouse.position) - state.canon.dragOffset
-        state.canon.rotate(to(targetAngle - state.canon.body.angle, float))
+        state.rotateCanon(to(targetAngle - state.canon.body.angle, float))
         state.calcTrajectory()
 
       elif state.trajectory.dragging:
@@ -735,7 +761,7 @@ proc onImagesLoaded*(state: var ParabolaState) =
   Body.scale(state.canon.platform.body, canonPlatformImg.width, canonPlatformImg.height)
 
   state.onResize(trajectory = false)
-  state.canon.rotateBack(degToRad(60d))
+  state.rotateCanonBack(degToRad(60d))
   state.calcTrajectory()
 
 ## Loads the simulation
@@ -799,7 +825,7 @@ proc load*(state: var ParabolaState) =
   state.canon.platform.body.xratio = canonXRatio
 
   state.ground = Bodies.rectangle(0, 0, state.canvas.clientWidth * 1000, groundHeight * 2, 
-    JsObject{zIndex: 1, isStatic: true, label: cstring"Ground"}
+    JsObject{zIndex: 1, friction: 1, isStatic: true, label: cstring"Ground"}
   ) # 350, 495, 1200
   state.ground.xratio = 0.5
   state.ground.yratio = 1
@@ -810,7 +836,7 @@ proc load*(state: var ParabolaState) =
   #state.mouseConstraint = MouseConstraint.create(state.engine, JsObject{mouse: state.mouse, collisionFilter: JsObject{mask: 0}})
   state.render.mouse = state.mouse
 
-  let roof = Bodies.rectangle(350, -200, 1000, 20, JsObject{isStatic: true, label: cstring"Roof"})
+  let roof = Bodies.rectangle(350, -1000, 1000, 20, JsObject{isStatic: true, label: cstring"Roof"})
   roof.xratio = 0.5
   roof.yratio = -0.6
 
@@ -855,8 +881,8 @@ proc reload*(state: var ParabolaState) =
   state.load()
 
 ## Since matter measures y from the top of the screen, here we "normalize" it so that the 0 starts at the ground
-proc normalizeY(state: ParabolaState, y: int, height: int): int =
-  -y + (state.ground.position.y.to(float).int - (groundHeight div 2) - height)
+proc normalizeY(state: ParabolaState, y: float, height: float): float =
+  -y + (state.ground.position.y.to(float) - (groundHeight / 2) - height)
 
 proc togglePause(state: var ParabolaState) = 
   if state.paused:
@@ -899,13 +925,13 @@ proc renderSimDiv*(state: var ParabolaState): VNode =
     button():
       span(class = "material-symbols-outlined", text "rotate_left")
       proc onclick() =
-        state.canon.rotateBack()
+        state.rotateCanonBack()
         state.calcTrajectory()
 
     button():
       span(class = "material-symbols-outlined", text "rotate_right")
       proc onclick() =
-        state.canon.rotate()
+        state.rotateCanon()
         state.calcTrajectory()
 
     #button():
@@ -974,10 +1000,10 @@ proc addEventListeners*(state: var ParabolaState) =
     of "t":
       state.calcTrajectory()
     of "ArrowRight":
-      state.canon.rotate()
+      state.rotateCanon()
       state.calcTrajectory()
     of "ArrowLeft":
-      state.canon.rotateBack()
+      state.rotateCanonBack()
       state.calcTrajectory()
     of "ArrowUp":
       state.canon.setSpeed(state.canon.state.speed + canonSpeedChange)

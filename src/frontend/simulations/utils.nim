@@ -168,21 +168,6 @@ var maskDefault* {.importjs: "0xFFFFFFFF", nodecl.}: JsObject
 
 proc isBetween*(c, a, b: Vec): bool = 
   return (distance(a, c) + distance(c, b)) - distance(a, b) == 0
-  #let crossproduct = (c.y - a.y) * (b.x - a.x) - (c.x - a.x) * (b.y - a.y)
-
-  ## compare versus epsilon for floating point values, or != 0 if using integers
-  #if to(abs(crossproduct).toJs > Epsilon, bool):
-  #    return false
-
-  #let dotproduct = (c.x - a.x) * (b.x - a.x) + (c.y - a.y)*(b.y - a.y)
-  #if dotproduct < 0:
-  #    return false
-
-  #let squaredlengthba = (b.x - a.x)*(b.x - a.x) + (b.y - a.y)*(b.y - a.y)
-  #if dotproduct > squaredlengthba:
-  #    return false
-
-  #return true
 
 iterator countthrough*(these: varargs[float], step: float): float {.inline.} =
   var res = these[0]
