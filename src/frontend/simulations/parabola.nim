@@ -127,18 +127,18 @@ proc calcVel*(initialState: CanonState, t: float): Vec =
 
 const
   fps = 60
-  timeScale = 0.2
+  timeScale = 0.025
   delta = (1000 / fps) * timeScale # 60fps, 60 times in one second (1000 milliseconds)
 
   # For some reason if you use the projectile motion formulas with matter-js
   # gravity you get a different trajectory, you instead have to multiply
   # matter-js gravity by this proportion to make it work :shrug:
-  gravityProportion = 279
+  gravityFactor = 279
 
   groundHeight = 80
 
   canonXRatio = 0.2 # Ratio
-  canonInitialSpeed = 25
+  canonInitialSpeed = 250.0
   canonSpeedChange = 1
   canonAngleChangeDeg = 3.0
 
@@ -150,24 +150,30 @@ const
   trajectoryLineWidth = 2
   trajectoryPointRadius = 7 # The radius of the trajectory point hovered by the mouse
 
-  velVectorScale = 5 # Scale of the velocity arrows
-  speedLimit = 20.0..40.0
+  velVectorScale = 1 # Scale of the velocity arrows
+  speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*2)
   rotationLimit = 10.0..170.0
 
 proc getPos(state: ParabolaState, p: TrajectoryPoint): Vec = 
   ## Converts p.pos into matter-js coordinates
   vec(
-    state.canon.pivot.x.to(float) + p.pos.x.fromMuDistance(),
-    state.canvas.clientHeight.float - groundHeight.float - p.pos.y.fromMuDistance()
+    state.canon.pivot.x.to(float) + p.pos.x,
+    state.canvas.clientHeight.float - groundHeight.float - p.pos.y
   )
 
-proc toMu(state: CanonState, delta = delta): CanonState = 
+proc toMu(state: CanonState): CanonState = 
   result = state
   with result:
-    speed = state.speed.toMuSpeed()
-    height = state.height.toMuDistance()
-    gravity = state.gravity.both(proc(a: float): float = toMuAcceleration(a))
+    speed = result.speed.toMuSpeed()
+    height = result.height.toMuDistance()
+    gravity = result.gravity.both(proc(a: float): float = toMuAcceleration(a))
     vel = speedToVelRad(result.speed, result.angleRad)
+
+proc toMu(point: TrajectoryPoint): TrajectoryPoint = 
+  result = point
+  with result:
+    pos = result.pos.both(proc(d: float): float = toMuDistance(d))
+    vel = result.vel.both(proc(v: float): float = toMuSpeed(v))
 
 proc canonBaseImg(state: ParabolaState): JsObject = 
   state.render.textures[canonBaseTexture]
@@ -230,8 +236,8 @@ proc nextBullet(state: var ParabolaState): JsObject =
   Body.setAngle(result, state.canon.state.angleDeg)
 
 proc calcTrajectory(state: var ParabolaState) =
-  var initialState = state.canon.state.toMu()
-  initialState.gravity = initialState.gravity * gravityProportion
+  var initialState = state.canon.state
+  initialState.gravity = initialState.gravity * gravityFactor
 
   let totalTime = initialState.calcTotalTime()
   state.trajectory.totalTime = totalTime
@@ -298,7 +304,7 @@ proc onResize(state: var ParabolaState, trajectory = true) =
     let canonPrevAngle = state.canon.body.angle.to(float) 
     state.canon.rotate(-canonPrevAngle, limit = false)
 
-    let baseY = state.canvas.clientHeight.float - groundHeight.float - (canonBaseImg.height.to(float))
+    let baseY = state.canvas.clientHeight.float - groundHeight.float + (canonBaseImg.height.to(float) * 0.2)
     state.canon.base.body.setY baseY
   
     let canonX = state.canon.base.body.position.x + (canonImg.width / 3.toJs)
@@ -364,8 +370,9 @@ proc initParabolaState*(): ParabolaState =
     boundsScaleTarget: 1, 
     canon: Canon(
       bulletRadius: 20, state: initCanonState(0, deg = true, 
-        canonInitialSpeed, gravity = vec(0, 9.807 / 
-          (gravityProportion * muMeterFactor))), 
+        canonInitialSpeed, gravity = vec(0, (9.807 * muMeterFactor) / 
+          gravityFactor)
+        ), 
       bulletOptions: JsObject{
         isStatic: false, frictionAir: 0, friction: 1,
       }),
@@ -390,6 +397,7 @@ proc onCollisionStart(state: var ParabolaState, event: JsObject) =
 
 proc onBeforeRender(state: var ParabolaState, event: JsObject) = 
   return
+  # WIP zoom
   let mouse = state.mouse#state.mouseConstraint.mouse
   var scaleFactor = mouse.wheelDelta.to(float) * -0.1
 
@@ -485,7 +493,6 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject) =
   let trjctry = state.trajectory
 
   ctx.beginPath()
-  #ctx.moveTo(points[0].getPos.x, points[0].getPos.y)
   let pos0 = state.getPos(trjctry.points[0])
   ctx.moveTo(pos0.x, pos0.y)
 
@@ -629,7 +636,7 @@ proc loadEvents(state: var ParabolaState) =
 
         # It is baseMax even though it's the lowest point since matter counts y from the top
         let baseMax = state.canvas.clientHeight.float - groundHeight.float + (canonBaseImg.height.to(float) * 0.2)
-        let baseMin = canonImg.width.to(float) + (canonBaseImg.height.to(float) * 0.2)#(state.canonBaseImg.height.to(float))
+        let baseMin = canonImg.width.to(float) + (canonBaseImg.height.to(float) * 0.2)
         let baseY = clamp(mousey, baseMin, baseMax)
         state.canon.base.body.setY baseY
 
@@ -658,6 +665,15 @@ proc loadEvents(state: var ParabolaState) =
         state.calcClosestTrajectoryPoint(state.mouse.position.vec())
         if not kxi.surpressRedraws: redraw(kxi)
     onMouseleave = proc (event: JsObject) = 
+      # If the mouse leaves the canvas while dragging the base through the
+      # bottom, drop the canon base to the floor. Since it's usual that if you
+      # move the mouse quickly, the position isn't registered all the time
+      # but every frame
+      #if state.canon.base.dragging:
+      #  if state.mouse.getY() >= state.canvas.clientHeight.float * 0.95:
+      #    state.canon.elevated = false
+      #    state.onResize()
+
       state.canon.dragging = false
       state.canon.base.dragging = false
       state.trajectory.dragging = false
@@ -668,7 +684,7 @@ proc loadEvents(state: var ParabolaState) =
     onWheel = proc (event: JsObject) = 
       let wheelDelta = event.wheelDelta.to(float)
       if wheelDelta != 0:
-        state.canon.setSpeed(state.canon.state.speed + (wheelDelta / 50))
+        state.canon.setSpeed(state.canon.state.speed + (wheelDelta))
         state.calcTrajectory()
 
   let pasiveTrue = JsObject{passive: true}
@@ -915,10 +931,10 @@ proc renderBottomDiv*(state: ParabolaState): VNode =
 
   if trajectory.dragging and trajectory.closestPoint in trajectory.points:
     show = true
-    point = trajectory.points[trajectory.closestPoint]
+    point = trajectory.points[trajectory.closestPoint].toMu()
   elif not trajectory.dragging and trajectory.pinnedPoint in trajectory.points:
     show = true
-    point = trajectory.points[trajectory.pinnedPoint]
+    point = trajectory.points[trajectory.pinnedPoint].toMu()
 
   buildHtml tdiv(id = "text", style = "display: inline-flex;gap: 25px;".toCss):
     if show:

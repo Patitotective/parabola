@@ -198,7 +198,7 @@ proc contains*[T: not int](a: openArray[T], index: int): bool =
 
 # MU = My Unit system
  #we do some adjustments so the numbers aren't so big...
-const muMeterFactor* = 10
+const muMeterFactor* = 10.0
 
 proc toMuDistance*(m: float): float = 
   m / muMeterFactor
