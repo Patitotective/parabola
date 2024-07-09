@@ -51,7 +51,6 @@ type
     currentBullet*: int
     bulletRadius*: int
 
-    elevated*: bool
     dragging*: bool # Is the canon being dragged
 
   CanonPlatform = object
@@ -80,15 +79,7 @@ type
     onMousedown*, onMouseup*, onMousemove*, 
       onMouseleave*, onWheel*: proc(event: JsObject)
 
-proc initCanonState(angle: float, deg = false, speed: float, 
-  gravity: Vec, height = 0.0): CanonState = 
-  let angleDeg = if deg: angle else: radToDeg(angle)
-  let angleRad = if deg: degToRad(angle) else: angle
-
-  CanonState(angleDeg: angleDeg, angleRad: angleRad, 
-    speed: speed, vel: speedToVelRad(speed, angleRad), 
-    gravity: gravity, height: height
-  )
+    floatPrecision*: range[0..8]
 
 # Projectile motion equations
 proc calcTotalTime*(initialState: CanonState): float = 
@@ -126,7 +117,7 @@ proc calcVel*(initialState: CanonState, t: float): Vec =
 
 const
   fps = 60
-  timeScale = 0.025
+  timeScale = 0.03
   delta = (1000 / fps) * timeScale # 60fps, 60 times in one second (1000 milliseconds)
 
   # For some reason if you use the projectile motion formulas with matter-js
@@ -152,6 +143,19 @@ const
   velVectorScale = canonInitialSpeed * 0.002 # Scale of the velocity arrows
   speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*1.5)
   angleLowerLimit = 16.0 # Lower limit when canon is too close to the floor
+
+proc setSpeed(state: var CanonState, speed: float) = 
+  state.speed = clamp(speed, speedLimit)
+  state.vel = speedToVelRad(state.speed, state.angleRad)  
+
+proc initCanonState(angle: float, deg = false, speed: float, 
+  gravity: Vec, height = 0.0): CanonState = 
+  let angleDeg = if deg: angle else: radToDeg(angle)
+  let angleRad = if deg: degToRad(angle) else: angle
+
+  result = CanonState(angleDeg: angleDeg, angleRad: angleRad, 
+    gravity: gravity, height: height)
+  result.setSpeed(speed)
 
 proc getPos(state: ParabolaState, p: TrajectoryPoint): Vec = 
   ## Converts p.pos into matter-js coordinates
@@ -235,10 +239,6 @@ proc rotateCanon(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), 
 proc rotateCanonBack(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), limit = true) =
   state.rotateCanon(-rad, limit)
 
-proc setSpeed(canon: var Canon, speed: float) = 
-  canon.state.speed = clamp(speed, speedLimit)
-  canon.state.vel = speedToVelRad(canon.state.speed, canon.state.angleRad)  
-
 proc nextBullet(state: var ParabolaState): JsObject = 
   result = Bodies.circle(
     state.canon.pivot.x, state.canon.pivot.y, 
@@ -292,7 +292,7 @@ proc calcTrajectory(state: var ParabolaState) =
 
   if not kxi.surpressRedraws: redraw(kxi)
 
-proc onResize(state: var ParabolaState, trajectory = true) = 
+proc onResize(state: var ParabolaState, trajectory = true, first = false) = 
   state.render.canvas.width = state.canvas.clientWidth
   state.render.canvas.height = state.canvas.clientHeight
 
@@ -315,27 +315,43 @@ proc onResize(state: var ParabolaState, trajectory = true) =
   let canonBaseImg = state.canonBaseImg or JsObject{width: 1, height: 1}
   let canonPlatformImg = state.canonPlatformImg or JsObject{width: 1, height: 1}
 
-  if not state.canon.elevated:# and not canonBaseImg.isUndefined and not canonPlatformImg.isUndefined:
-    let canonPrevAngle = state.canon.body.angle.to(float) 
-    state.rotateCanon(-canonPrevAngle, limit = false)
+  # We rotate it to be able to position it correctly
+  let canonPrevAngle = state.canon.body.angle.to(float) 
+  state.rotateCanon(-canonPrevAngle, limit = false)
 
-    let baseY = state.canvas.clientHeight.float - groundHeight.float + (canonBaseImg.height.to(float) * 0.2)
-    state.canon.base.body.setY baseY
+  # It is baseMax even though it's the lowest point since matter counts y from the top
+  let baseMax = state.canvas.clientHeight.float - groundHeight.float + (canonBaseImg.height.to(float) * 0.2)
+  let baseMin = canonImg.width.to(float) + (canonBaseImg.height.to(float) * 0.2)
+  let desiredBaseY = 
+    if state.canon.base.dragging:
+      state.mouse.position.y.to(float) + state.canon.base.dragOffset
+    else:
+      if first: baseMax
+      else: state.canon.base.body.getY()
+
+  let baseY = clamp(desiredBaseY, baseMin, baseMax)
+  state.canon.base.body.setY baseY
+
+  let canonYDiff = canonBaseImg.height.to(float) * 0.2
+  # It is canonMax even though it's the lowest point since matter counts y zero from the top
+  let canonMax = baseMax - canonYDiff
+  let canonMin = canonImg.width.to(float)
+
+  let canonY = clamp(baseY - canonYDiff, canonMin, canonMax)
+
+  let canonX = state.canon.base.body.position.x + (canonImg.width / 3.toJs)
+
+  state.canon.body.setPos canonX, canonY
   
-    let canonX = state.canon.base.body.position.x + (canonImg.width / 3.toJs)
-    let canonY = baseY.toJs - (canonBaseImg.height * 0.2.toJs)
+  state.canon.pivot = JsObject{x: state.canon.base.body.position.x, y: canonY}
+  state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
 
-    state.canon.body.setPos canonX, canonY
-    
-    state.canon.pivot = JsObject{x: state.canon.base.body.position.x, y: canonY}
-    state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
+  let platformY = (baseY * 1.02) + (canonPlatformImg.height.to(float) / 2)
+  state.canon.platform.body.setY platformY
 
-    let platformY = (baseY * 1.02) + (canonPlatformImg.height.to(float) / 2)
-    state.canon.platform.body.setY platformY
-
-    state.rotateCanon(canonPrevAngle, limit = false)
-    if trajectory:
-      state.calcTrajectory()
+  state.rotateCanon(canonPrevAngle, limit = false)
+  if trajectory:
+    state.calcTrajectory()
 
 proc `bullet`(canon: Canon): JsObject = 
   assert canon.currentBullet in canon.bullets, &"Invalid bullet index {canon.currentBullet}"
@@ -383,6 +399,7 @@ proc initParabolaState*(): ParabolaState =
   result = ParabolaState(
     boundsScale: JsObject{x: 1, y: 1},
     boundsScaleTarget: 1, 
+    floatPrecision: 1,
     canon: Canon(
       bulletRadius: 20, state: initCanonState(0, deg = true, 
         canonInitialSpeed, gravity = vec(0, (9.807 * muMeterFactor) / 
@@ -567,10 +584,20 @@ proc drawTrajectory(state: ParabolaState, ctx: JsObject) =
 
 proc drawHeight(state: ParabolaState, ctx: JsObject) = 
   if not state.canon.pivot.isNull:
-    ctx.font = cstring"20px serif"
+    # So that when clientHeight is 621, size is 25
+    #let fontSize = int round(state.canvas.clientHeight.float * 
+    #  0.040257648953301126, 0)
+    let height = state.canon.state.height.toMuDistance.round(state.floatPrecision)
+    let text = &"{height}m"
+    
+    ctx.font = cstring "25px serif"
     ctx.fillStyle = cstring"white"
-    ctx.fillText(cstring &"{state.canon.state.height.toMuDistance:.1f}m", 
-      state.canon.pivot.x.to(float) - 110, 
+    let textsSize = ctx.measureText(cstring text)
+
+    let canonPlatformImg = state.canonPlatformImg or JsObject{width: 1, height: 1}
+
+    ctx.fillText(cstring text, 
+      state.canon.pivot.x - textsSize.width - (canonPlatformImg.width / 1.8.toJs), 
       state.canvas.clientHeight.float - groundHeight - 10)
 
 proc onAfterRender(state: var ParabolaState, event: JsObject) = 
@@ -614,53 +641,19 @@ proc unloadEvents(state: var ParabolaState) =
 
 proc loadEvents(state: var ParabolaState) = 
   proc onMousemove(event: JsObject) = 
-    let canonImg = state.canonImg or JsObject{width: 1, height: 1}
-    let canonBaseImg = state.canonBaseImg or JsObject{width: 1, height: 1}
-    let canonPlatformImg = state.canonPlatformImg or JsObject{width: 1, height: 1}
-
-    if state.canon.base.dragging:
-      let canonPrevAngle = state.canon.body.angle.to(float) 
-      state.rotateCanon(-canonPrevAngle, limit = false)
-
-      let mousey = state.mouse.position.y.to(float) + state.canon.base.dragOffset
-
-      # It is baseMax even though it's the lowest point since matter counts y from the top
-      let baseMax = state.canvas.clientHeight.float - groundHeight.float + (canonBaseImg.height.to(float) * 0.2)
-      let baseMin = canonImg.width.to(float) + (canonBaseImg.height.to(float) * 0.2)
-      let baseY = clamp(mousey, baseMin, baseMax)
-      state.canon.base.body.setY baseY
-
-      state.canon.elevated = baseY != baseMax
-
-      let platformY = (baseY * 1.02)  + (canonPlatformImg.height.to(float) / 2)
-      state.canon.platform.body.setY platformY
-
-      # It is canonMax even though it's the lowest point since matter counts y zero from the top
-      let canonMax = state.canvas.clientHeight.float - groundHeight.float# - (state.canonBaseImg.height.to(float) * 0.5)
-      let canonMin = canonImg.width.to(float) # We add half the base height since the canon is always lower than the base
-      let canonY = clamp(mousey - (canonBaseImg.height.to(float) * 0.2), canonMin, canonMax)
-      state.canon.body.setY canonY
-
-      state.canon.pivot.y = canonY
-      state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - state.canon.pivot.y.to(float)
-      state.rotateCanon(canonPrevAngle, limit = false)
-
-      state.rotateCanon(0)
-
-      #if state.canon.state.height <= canonImg.height.to(float):
-        #state.rotateCanon(degToRad(angleLowerLimit) - 
-          #state.canon.body.angle.to(float))
-
-      state.calcTrajectory()
-
-    elif state.canon.dragging:
+    if state.canon.dragging:
       let targetAngle = Vector.angle(state.canon.pivot, state.mouse.position) - state.canon.dragOffset
       state.rotateCanon(to(targetAngle - state.canon.body.angle, float))
       state.calcTrajectory()
 
+    elif state.canon.base.dragging:
+      state.onResize()
+      state.rotateCanon(0) # To check if the canon is in the rotation limit
+
     elif state.trajectory.dragging:
       state.calcClosestTrajectoryPoint(state.mouse.position.vec())
       if not kxi.surpressRedraws: redraw(kxi)
+
   proc onMousedown(event: JsObject) = 
     case event.button.to(int)
     of 0:
@@ -675,11 +668,13 @@ proc loadEvents(state: var ParabolaState) =
           state.trajectory.pinnedPoint = -1
           if not kxi.surpressRedraws: redraw(kxi)
 
+      elif Bounds.contains(state.canon.base.body.bounds, state.mouse.position).to(bool):
+        state.canon.base.dragging = true
+        state.canon.base.dragOffset = state.canon.base.body.getY - state.mouse.position.y.to(float)
       elif Bounds.contains(state.canon.body.bounds, state.mouse.position).to(bool): 
         state.canon.dragging = true
         state.canon.dragOffset = Vector.angle(state.canon.pivot, state.mouse.position) - state.canon.body.angle
-      elif Bounds.contains(state.canon.base.body.bounds, state.mouse.position).to(bool) or 
-        Bounds.contains(state.canon.platform.body.bounds, state.mouse.position).to(bool):
+      elif Bounds.contains(state.canon.platform.body.bounds, state.mouse.position).to(bool):
         state.canon.base.dragging = true
         state.canon.base.dragOffset = state.canon.base.body.getY - state.mouse.position.y.to(float)
 
@@ -719,7 +714,8 @@ proc loadEvents(state: var ParabolaState) =
   proc onWheel(event: JsObject) = 
     let wheelDelta = event.wheelDelta.to(float)
     if wheelDelta != 0:
-      state.canon.setSpeed(state.canon.state.speed + (wheelDelta))
+      let change = wheelDelta * (canonInitialSpeed / 4800)
+      state.canon.state.setSpeed(state.canon.state.speed + change)
       state.calcTrajectory()
 
   with state:
@@ -776,7 +772,7 @@ proc onImagesLoaded*(state: var ParabolaState) =
   Body.scale(state.canon.base.body, canonBaseImg.width, canonBaseImg.height)
   Body.scale(state.canon.platform.body, canonPlatformImg.width, canonPlatformImg.height)
 
-  state.onResize(trajectory = false)
+  state.onResize(trajectory = false, first = true)
   state.rotateCanonBack(degToRad(60d))
   state.calcTrajectory()
 
@@ -914,12 +910,12 @@ proc renderTopDiv*(state: ParabolaState): VNode =
   buildHtml tdiv(id = "text", style = "".toCss):
     #p(text r"\(t_f = \frac{2 \cdot v_i \cdot \sin(\theta)}{g}\)", style = "font-size: 50px;".toCss)
 
-    p(text &"h = {siInitialState.height:.1f}")
-    p(text &"α = {siInitialState.angleDeg:.0f}")
+    p(text &"h = {siInitialState.height.round(state.floatPrecision)}")
+    p(text &"α = {siInitialState.angleDeg.round(state.floatPrecision)}")
 
-    p(text &"Vi = {siInitialState.speed:.1f}")
+    p(text &"Vi = {siInitialState.speed.round(state.floatPrecision)}")
 
-    p(text &"total time = {state.trajectory.totalTime:.2f}")
+    p(text &"total time = {state.trajectory.totalTime.round(state.floatPrecision)}")
 
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
@@ -980,11 +976,11 @@ proc renderBottomDiv*(state: ParabolaState): VNode =
 
   buildHtml tdiv(id = "text", style = "display: inline-flex;gap: 25px;".toCss):
     if show:
-      p(text &"x = {point.pos.x:.1f} y = {point.pos.y:.1f}")
-      p(text &"t = {point.time:.2f}")
+      p(text &"x = {point.pos.x.round(state.floatPrecision)} y = {point.pos.y.round(state.floatPrecision)}")
+      p(text &"t = {point.time.round(state.floatPrecision)}")
 
-      p(text &"Vx = {point.vel.x:.1f}")
-      p(text &"Vy = {point.vel.y:.1f}")
+      p(text &"Vx = {point.vel.x.round(state.floatPrecision)}")
+      p(text &"Vy = {point.vel.y.round(state.floatPrecision)}")
 
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
@@ -1022,10 +1018,10 @@ proc addEventListeners*(state: var ParabolaState) =
       state.rotateCanonBack()
       state.calcTrajectory()
     of "ArrowUp":
-      state.canon.setSpeed(state.canon.state.speed + canonSpeedChange)
+      state.canon.state.setSpeed(state.canon.state.speed + canonSpeedChange)
       state.calcTrajectory()
     of "ArrowDown":
-      state.canon.setSpeed(state.canon.state.speed - canonSpeedChange)
+      state.canon.state.setSpeed(state.canon.state.speed - canonSpeedChange)
       state.calcTrajectory()
     of " ":
       state.fireBullet()
