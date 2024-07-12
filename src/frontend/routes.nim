@@ -4,7 +4,7 @@ import std/[tables, uri, dom]
 import karax/[karaxdsl, vdom]
 
 import patterns, utils
-from ../config import nil
+import ../config as _
 
 type
   Params* = Table[string, string]

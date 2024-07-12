@@ -1,5 +1,12 @@
-const
-  title* {.define.} = "Grado"
-  appPath* {.define.} = "/" # Path where the app is: https://www.example.com/ or https://www.example.com/app
-  port* {.define.} = 8081
+import std/os
+import kdl, kdl/[decoder]
 
+type
+  Config* = object
+    title*: string
+    appPath*: string # Path where the app is: https://www.example.com/ or https://www.example.com/app
+    port*: int
+    hostname*: string
+
+const configPath* {.define.} = currentSourcePath.parentDir() / "config.kdl"
+const config* = configPath.parseKdlFile().decodeKdl(Config)

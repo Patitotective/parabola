@@ -1,0 +1,4 @@
+title "Grado"
+appPath "/"
+port 8081
+hostname "hostname.com"
