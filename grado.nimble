@@ -17,7 +17,12 @@ requires "prologue >= 0.6.4"
 requires "sass >= 0.2.0"
 requires "kdl >= 2.0.1"
 
-task frontend, "Compiles the frontend to JavaScript":
+task frontend, "Compiles the frontend to JavaScript and builds the CSS":
   exec "nimble c -r --mm:refc src/buildcss"
   exec "nim js --outdir:public/js src/frontend"
 
+task js, "Compiles the frontend to JavaScript":
+  exec "nim js --outdir:public/js src/frontend"
+
+task css, "Builds the CSS":
+  exec "nimble c -r --mm:refc src/buildcss"

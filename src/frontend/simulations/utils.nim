@@ -126,7 +126,7 @@ function drawArrow(ctx, fromx, fromy, tox, toy, arrowWidth, color){
     var headlen = 10;
     var angle = Math.atan2(toy-fromy,tox-fromx);
  
-    ctx.save();
+    //ctx.save();
     ctx.strokeStyle = color;
  
     //starting path of the arrow from the start square to the end square
@@ -156,7 +156,7 @@ function drawArrow(ctx, fromx, fromy, tox, toy, arrowWidth, color){
  
     //draws the paths created above
     ctx.stroke();
-    ctx.restore();
+    //ctx.restore();
 }
 """}
 
@@ -207,3 +207,8 @@ proc fromMuSpeed*(speed: float): float =
 proc fromMuAcceleration*(acceleration: float): float = 
   acceleration * muMeterFactor
 
+proc class*(classes: varargs[tuple[name: string, present: bool]],
+           defaultClasses: string = ""): string =
+  result = defaultClasses & " "
+  for class in classes:
+    if class.present: result.add(class.name & " ")

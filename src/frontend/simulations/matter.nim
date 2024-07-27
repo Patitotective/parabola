@@ -52,6 +52,10 @@ proc getPos*(body: JsObject): tuple[x, y: float] =
 proc vec*(v: JsObject): Vec = 
   (x: v.x.to(float), y: v.y.to(float))
 
+proc sizeVec*(v: JsObject): Vec = 
+  ## Expects v = JsObject{width: w, height: h}
+  (x: v.width.to(float), y: v.height.to(float))
+
 proc vec*(x, y: JsObject): Vec = 
   (x: x.to(float), y: y.to(float))
 

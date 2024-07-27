@@ -45,8 +45,9 @@ var state = newState()
 # addTranslation(esCo, "s/0/")
 
 proc renderHome(params: Params): VNode =
+  #discard setTimeout(proc() = navigateTo("/parabola"), 10)
   navigateTo("/parabola")
-  
+
   buildHtml(tdiv):
     text "Welcome to my grado project"
 
@@ -54,10 +55,9 @@ proc render(): VNode =
   buildHtml(tdiv):
     # renderHeader()
     state.location.route([
-      r("/parabola", proc(params: Params): VNode =
+      r("/", proc(params: Params): VNode =
         state.parabola.render()
-      ),
-      r("/", renderHome)
+      )
     ])
 
 proc postRender() =
@@ -70,7 +70,6 @@ proc postRender() =
 # Here we fake the moving-back-in-history action so it doesn't actually reload the page
 # Instead, it just refreshes the state and asks karax to redraw the page
 window.onPopState = proc(event: Event) =
-  # echo (old: state.location.href, new: window.location.href)
   document.title = state.prevTitle
   if state.location.href != window.location.href:
     state = newState() # Reload the state to remove stale data.

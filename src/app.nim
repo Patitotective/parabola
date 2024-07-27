@@ -1,7 +1,7 @@
 import std/[options, sugar, re, os] # logging
 import prologue, prologue/middlewares/[staticfile, utils]
 
-from config import nil
+import config as _
 
 # addHandler newConsoleLogger(fmtStr = "")
 
