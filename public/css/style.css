@@ -2793,17 +2793,10 @@ a.text-error:visited {
   word-break: break-word;
   word-wrap: break-word; }
 
-body {
-  margin: 0;
-  background: #0C0D11;
-  color: white; }
-
-html, #ROOT {
+html, body, #ROOT {
   height: 100%;
   width: 100%; }
 
 body {
-  height: 100%;
-  width: 100%;
   margin: 0;
   overflow: hidden; }

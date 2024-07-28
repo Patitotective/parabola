@@ -985,7 +985,7 @@ proc load*(state: var ParabolaState) =
 
   state.thingy = Bodies.rectangle(state.canvas.clientWidth / 2, 
     state.canvas.clientHeight.float * 0.6, 60, 80, 
-    JsObject{isStatic: false, label: cstring"Thingy", frictionAir: 0.3, friction: 1, frictionStatic: 1,
+    JsObject{isStatic: false, label: cstring"Thingy", frictionAir: 0.1, friction: 1, frictionStatic: 1,
       plugin: JsObject{wrap: state.wrapObject}})
   #Body.setInertia(state.thingy, 0.1)
 
@@ -1133,22 +1133,28 @@ proc renderPointTab*(state: ParabolaState): VNode =
 
 proc renderRightDiv*(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "column col-4"):
-    ul(class = "tab tab-block"):
-      li(class=class({"active": state.currentTab == tState}, "tab-item"),
-        onClick=proc(e: Event, n: VNode) = (state.currentTab = tState)):
-          a(id="state-tab", class="c-hand"):
-            text "State"
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-1", hidden = true, checked = true)
+      label(class = "accordion-header", `for` = "accordion-1"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text "State"
+      tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
+        state.renderStateTab()
 
-      li(class=class({"active": state.currentTab == tPoint}, "tab-item"),
-        onClick=proc(e: Event, n: VNode) = (state.currentTab = tPoint)):
-          a(id="point-tab", class="c-hand"):
-            text "Trajectory Point"
-
-    case state.currentTab
-    of tState:
-      state.renderStateTab()
-    of tPoint:
-      state.renderPointTab()
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-2", hidden = true, checked = true)
+      label(class = "accordion-header", `for` = "accordion-2"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text "Point"
+      tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
+        state.renderPointTab()
+        
+      #li(class=class({"active": state.currentTab == tPoint}, "tab-item"),
+      #  onClick=proc(e: Event, n: VNode) = (state.currentTab = tPoint)):
+      #    a(id="point-tab", class="c-hand"):
+      #      text "Trajectory Point"
 
 proc render*(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "container", style = "height: 100%".toCss):
