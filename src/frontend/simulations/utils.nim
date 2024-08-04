@@ -128,6 +128,7 @@ function drawArrow(ctx, fromx, fromy, tox, toy, arrowWidth, color){
  
     //ctx.save();
     ctx.strokeStyle = color;
+    ctx.fillStyle = color;
  
     //starting path of the arrow from the start square to the end square
     //and drawing the stroke
