@@ -54,6 +54,20 @@
   <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 
   <!-- Mathjax -->
+  <script>
+    MathJax = {
+      // loader: {load: ['ui/lazy']},
+      options: {
+        enableMenu: true,          // set to false to disable the menu
+        menuOptions: {
+          settings: {
+            zoom: 'DoubleClick',        // or 'Click' or 'DoubleClick' as zoom trigger
+            zscale: '200%',        // zoom scaling factor
+          },
+        }
+      }
+    }
+  </script>
   <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 
   <!-- Frontend   -->

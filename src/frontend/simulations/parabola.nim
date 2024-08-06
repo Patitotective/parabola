@@ -299,11 +299,35 @@ proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryP
       closestDistance = d
       result.index = e
 
+proc updateFormulaAccordion(state: ParabolaState) = 
+  echo "update formulas"
+  let m1 = getElementById("m1")
+  let m2 = getElementById("m2")
+  MathJax.typesetClear([m1, m2])
+
+  var siInitialState = state.canon.state.toMu()
+  siInitialState.gravity = siInitialState.gravity * gravityFactor
+
+  let h = state.strfloat(siInitialState.height)
+  let voy = state.strfloat(siInitialState.vel.y)
+  let g = state.strfloat(siInitialState.gravity.y)
+  let voySquared = state.strfloat(siInitialState.vel.y ^ 2)
+  let gTwice = state.strfloat(2 * siInitialState.gravity.y)
+
+  let m1t = r"\(h_{max} = <h>m + \dfrac{2\:\cdot\:(<voy>m/s)^{2}}{2\:\cdot\:<g>m/s^2}\)".fmt('<', '>')
+  let m2t = r"\(h_{max} = <h>m + \dfrac{2\:\cdot\:<voySquared>m/s^2}{<gTwice>m/s^2}\)".fmt('<', '>')
+
+  m1.textContent = cstring m1t
+  m2.textContent = cstring m2t
+  # Render all MathJax expressions asynchronously
+  MathJax.typesetPromise([m1, m2])
+
 proc updateStateAccordion(state: ParabolaState) = 
   let siInitialState = state.canon.state.toMu()
 
   getElementById("state-input-h").value = cstring state.strfloat(siInitialState.height)
   getElementById("state-input-a").value = cstring &"{siInitialState.angleDeg:.0f}"
+  getElementById("state-input-s").value = cstring state.strfloat(siInitialState.speed)
 
 proc updatePointAccordion(state: ParabolaState) = 
   let trjctry = state.trajectory
@@ -378,6 +402,7 @@ proc calcTrajectory(state: var ParabolaState) =
 
   state.updatePointAccordion()
   state.updateStateAccordion()
+  state.updateFormulaAccordion()
 
 ## The difference of canon's y respect base's y
 proc canonYDiff(state: ParabolaState): float = 
@@ -1125,7 +1150,7 @@ proc onImagesLoaded*(state: var ParabolaState) =
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
   # Render all MathJax expressions asynchronously
-  MathJax.typesetPromise()
+  #MathJax.typesetPromise()
 
   # Load wrap's plugin and load matter aliases to point to the correct values
   Matter.use("matter-wrap")
@@ -1305,8 +1330,31 @@ proc renderLeftDiv*(state: var ParabolaState): VNode =
       #style = fmt"width: 100vw; min-width: 500px height: 65vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
 
+proc renderFormulasAccordion*(state: var ParabolaState): VNode =
+  let siInitialState = state.canon.state.toMu()
+
+  buildHtml tdiv(class = "container"):
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-1", hidden = true, checked = true)
+      label(class = "accordion-header", `for` = "accordion-f-1"):
+        #text "Initial State"
+
+        tdiv(class = "columns", style = "align-items: center;".toCss):
+          tdiv(class = "column"):
+            italic(class = "icon icon-arrow-right mr-1")
+            text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g}\)"
+
+          tdiv(class = "column"):
+            text "Max Height"
+          
+      tdiv(class = "accordion-body", style = "".toCss):
+        ul:
+          li(id = "m1", style = "".toCss) # font-size: 1.2em;
+          li(id = "m2")
+
 proc renderStateAccordion*(state: var ParabolaState): VNode =
-  var siInitialState = state.canon.state.toMu()
+  let siInitialState = state.canon.state.toMu()
  
   proc onInputHChange(e: Event, n: VNode) = 
     if not state.rendering: return
@@ -1320,8 +1368,6 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
     state.moveCanonTo(state.canvas.clientHeight.float - 
       groundHeight.float - h + state.canonYDiff)
     state.calcTrajectory()
-
-    state.updateStateAccordion()
   
   proc onInputAChange(e: Event, n: VNode) = 
     if not state.rendering: return
@@ -1335,11 +1381,17 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
     ))
     state.calcTrajectory()
 
-    state.updateStateAccordion()
+  proc onInputSChange(e: Event, n: VNode) = 
+    if not state.rendering: return
 
-  buildHtml form(class = "form-horizontal", onsubmit = proc(e: Event, n: VNode) = echo (e: e[], n: n[])):
-    #p(text r"\(t_f = \frac{2 \cdot v_i \cdot \sin(\theta)}{g}\)", style = "font-size: 50px;".toCss)
+    var s = 0.0
 
+    discard parseFloat($n.value, s)
+    s = s.fromMuSpeed().round(state.floatPrecision)
+    state.canon.state.setSpeed(s)
+    state.calcTrajectory()
+  
+  buildHtml form(class = "form-horizontal"):
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "state-input-h"): text "Height"
@@ -1354,12 +1406,15 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
         input(class = "form-input form-inline", `type` = "number", id = "state-input-a", 
           step = "1", onchange = onInputAChange)
 
+    tdiv(class = "form-group"): 
+      tdiv(class = "col-3 col-sm-12"):
+        label(class = "form-label", `for` = "state-input-s"): text "Speed"
+      tdiv(class = "col-9 col-sm-12"):
+        input(class = "form-input form-inline", `type` = "number", id = "state-input-s", 
+          step = state.inputStep, onchange = onInputSChange)
+
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
-
-    #p(text &"α = {state.strfloat(siInitialState.angleDeg)}")
-
-    #p(text &"Vi = {state.strfloat(siInitialState.speed)}")
 
     #p(text &"total time = {state.strfloat(state.trajectory.totalTime)}")
 
@@ -1589,7 +1644,7 @@ proc renderRightDiv*(state: var ParabolaState): VNode =
         id = "accordion-1", hidden = true, checked = true)
       label(class = "accordion-header", `for` = "accordion-1"):
         italic(class = "icon icon-arrow-right mr-1")
-        text "State"
+        text "Initial State"
       tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
         state.renderStateAccordion()
 
@@ -1601,7 +1656,16 @@ proc renderRightDiv*(state: var ParabolaState): VNode =
         text "Point"
       tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
         state.renderPointAccordion()
-        
+
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-3", hidden = true, checked = true)
+      label(class = "accordion-header", `for` = "accordion-3"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text "Formulas"
+      tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
+        state.renderFormulasAccordion()
+
       #li(class=class({"active": state.currentTab == tPoint}, "tab-item"),
       #  onClick=proc(e: Event, n: VNode) = (state.currentTab = tPoint)):
       #    a(id="point-tab", class="c-hand"):
