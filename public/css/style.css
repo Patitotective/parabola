@@ -2802,4 +2802,8 @@ body {
   overflow: hidden; }
 
 .CtxtMenu_InfoContent {
-  max-width: 90vw !important; }
+  max-width: 50vw !important;
+  line-height: 800% !important; }
+
+.CtxtMenu_Info {
+  font-size: 108% !important; }

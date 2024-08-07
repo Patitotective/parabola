@@ -300,36 +300,106 @@ proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryP
       result.index = e
 
 proc updateFormulaAccordion(state: ParabolaState) = 
-
   var siInitialState = state.canon.state.toMu()
   siInitialState.gravity = siInitialState.gravity * gravityFactor
+  let vySquared = siInitialState.vel.y ^ 2
+  let gTwice = siInitialState.gravity.y * 2
+  let vySquaredTwice = vySquared * 2
+  let gTimesH = siInitialState.gravity.y * siInitialState.height
 
-  let gTwice = state.strfloat(2 * siInitialState.gravity.y)
+  proc updateMaxHeightFormula() = 
+    let mh1 = getElementById("mh1")
 
-  let m1 = getElementById("m1")
-  let m2 = getElementById("m2")
+    mh1.firstChild.firstChild.children[2].firstChild.innerText = 
+      cstring &"{state.strfloat(siInitialState.height)}m"
 
-  m1.firstChild.firstChild.children[2].firstChild.innerText = 
-    cstring &"{state.strfloat(siInitialState.height)}m"
+    mh1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+      firstChild.children[1].children[4].firstChild.innerText = 
+      cstring &"({state.strfloat(siInitialState.vel.y)}m/s)"
 
-  m1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-    firstChild.children[1].children[4].firstChild.innerText = 
-    cstring &"({state.strfloat(siInitialState.vel.y)}m/s)"
+    mh1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+      children[1].firstChild.children[1].firstChild.children[1].children[4].
+      innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
 
-  m1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-    children[1].firstChild.children[1].firstChild.children[1].children[4].
-    innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
+    let mh2 = getElementById("mh2")
 
-  m2.firstChild.firstChild.children[2].firstChild.innerText = 
-    cstring &"{state.strfloat(siInitialState.height)}m"
+    mh2.firstChild.firstChild.children[2].firstChild.innerText = 
+      cstring &"{state.strfloat(siInitialState.height)}m"
 
-  m2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-    firstChild.children[1].children[4].innerText = 
-    cstring &"({state.strfloat(siInitialState.vel.y ^ 2)}m²/s²)"
+    mh2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+      firstChild.children[1].children[4].innerText = 
+      cstring &"{state.strfloat(vySquared)}m²/s²"
 
-  m2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-    children[1].firstChild.children[1].firstChild.children[1].
-    innerText = cstring &"{state.strfloat(siInitialState.gravity.y * 2)}m/s²"
+    mh2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+      children[1].firstChild.children[1].firstChild.children[1].
+      innerText = cstring &"{state.strfloat(gTwice)}m/s²"
+
+    let mh3 = getElementById("mh3")
+
+    mh3.firstChild.firstChild.children[2].firstChild.innerText = 
+      cstring &"{state.strfloat(siInitialState.height)}m"
+
+    mh3.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+      firstChild.innerText = cstring &"({state.strfloat(vySquaredTwice)}m²/s²)"
+
+    mh3.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
+      "mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > " & 
+      "mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > " & 
+      "mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)").
+      innerText = cstring &"{state.strfloat(gTwice)}m/s²"
+
+    let mh4 = getElementById("mh4")
+    let upPart = vySquaredTwice / gTwice
+
+    mh4.firstChild.firstChild.children[2].firstChild.innerText = 
+      cstring &"{state.strfloat(siInitialState.height)}m"
+
+    mh4.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
+      "mjx-mrow:nth-child(3) > mjx-mi:nth-child(3)").
+      innerText = cstring &"{state.strfloat(upPart)}m"
+
+    let mh5 = getElementById("mh5")
+    mh5.querySelector("#mh5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
+      "mjx-mi:nth-child(3)").innerText = 
+      cstring &"{state.strfloat(siInitialState.height + upPart)}m"
+
+  proc updateTimeOfFlightFormula() = 
+    let tf1 = getElementById("tf1")
+    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
+      "mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > " & 
+      "mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)").
+      innerText = cstring &"{state.strfloat(siInitialState.vel.y)}m/s"
+
+    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
+      "mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > " & 
+      "mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > " & 
+      "mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > " & 
+      "mjx-msup:nth-child(1) > mjx-mi:nth-child(1)").innerText = 
+      cstring &"({state.strfloat(siInitialState.vel.y)}m/s)"
+
+    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)").
+      innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
+
+    tf1.querySelector("mjx-mi.mjx-i:nth-child(9)").innerText = 
+      cstring &"{state.strfloat(siInitialState.height)}m"
+
+    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)").
+      innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
+
+    let changes = {
+      "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+         &"{state.strfloat(siInitialState.vel.y)}m/s", 
+      "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
+        &"{state.strfloat(vySquared)}m²/s²", 
+      "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+        &"{state.strfloat(gTimesH)}m²/s²", 
+    }
+
+    for (query, value) in changes:
+      document.querySelector(query).innerText = cstring value
+
+  updateMaxHeightFormula()
+  updateTimeOfFlightFormula()
 
 proc updateStateAccordion(state: ParabolaState) = 
   let siInitialState = state.canon.state.toMu()
@@ -337,6 +407,8 @@ proc updateStateAccordion(state: ParabolaState) =
   getElementById("state-input-h").value = cstring state.strfloat(siInitialState.height)
   getElementById("state-input-a").value = cstring &"{siInitialState.angleDeg:.0f}"
   getElementById("state-input-s").value = cstring state.strfloat(siInitialState.speed)
+  getElementById("state-input-vx").value = cstring state.strfloat(siInitialState.vel.x)
+  getElementById("state-input-vy").value = cstring state.strfloat(siInitialState.vel.y)
 
 proc updatePointAccordion(state: ParabolaState) = 
   let trjctry = state.trajectory
@@ -1347,28 +1419,59 @@ proc renderLeftDiv*(state: var ParabolaState): VNode =
 
 proc renderFormulasAccordion*(state: var ParabolaState): VNode =
   let siInitialState = state.canon.state.toMu()
+  let liStyle = "margin-top: 20px;".toCss
+  let bodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
   buildHtml tdiv(class = "container"):
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-1", hidden = true, checked = false)
       label(class = "accordion-header", `for` = "accordion-f-1"):
-        #text "Initial State"
-
         tdiv(class = "columns", style = "align-items: center;".toCss):
           tdiv(class = "column"):
             italic(class = "icon icon-arrow-right mr-1")
             text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g}\)"
 
-          tdiv(class = "column"):
-            text "Max Height"
+          tdiv(class = "column col-3"):
+            text "Max height"
           
-      tdiv(class = "accordion-body", style = "".toCss):
-        ul:
-          li(id = "m1", style = "".toCss): # font-size: 1.2em;
+      tdiv(class = "accordion-body", style = bodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(id = "mh1"): # font-size: 1.2em;
             text r"\(h_{max} = h + \dfrac{2\:\cdot\:(v)^{2}}{2\:\cdot\:g}\)"
-          li(id = "m2"):
+          li(id = "mh2", style = liStyle):
             text r"\(h_{max} = h + \dfrac{2\:\cdot\:v}{g}\)"
+          li(id = "mh3", style = liStyle):
+            text r"\(h_{max} = h + \dfrac{v}{g}\)"
+          li(id = "mh4", style = liStyle):
+            text r"\(h_{max} = h + a\)"
+          li(id = "mh5", style = liStyle):
+            text r"\(h_{max} = h\)"
+
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-2", hidden = true, checked = false)
+      label(class = "accordion-header", `for` = "accordion-f-2"):
+        tdiv(class = "columns", style = "align-items: center;".toCss):
+          tdiv(class = "column"):
+            italic(class = "icon icon-arrow-right mr-1")
+            text r"\(t_{f} = \dfrac{v_{iy}\:+\:\sqrt{v_{iy}^{2}\:+\:2gh}}{g}\)"
+
+          tdiv(class = "column col-3"):
+            text "Time of flight"
+          
+      tdiv(class = "accordion-body", style = bodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(id = "tf1"): # font-size: 1.2em;
+            text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v^{2}\:+\:2\:\cdot\:g\:\cdot\:h}}{g}\)"
+          li(id = "tf2", style = liStyle):
+            text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v\:+\:2\:\cdot\:a}}{g}\)"
+          li(id = "tf3", style = liStyle):
+            text r"\(h_{max} = h + \dfrac{v}{g}\)"
+          li(id = "tf4", style = liStyle):
+            text r"\(h_{max} = h + a\)"
+          li(id = "tf5", style = liStyle):
+            text r"\(h_{max} = h\)"
 
 proc renderStateAccordion*(state: var ParabolaState): VNode =
   let siInitialState = state.canon.state.toMu()
@@ -1429,6 +1532,20 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-s", 
           step = state.inputStep, onchange = onInputSChange)
+
+    tdiv(class = "form-group"): 
+      tdiv(class = "col-3 col-sm-12"):
+        label(class = "form-label", `for` = "state-input-vx"): text "Vel X"
+      tdiv(class = "col-9 col-sm-12"):
+        input(class = "form-input form-inline", `type` = "number", id = "state-input-vx", 
+          readonly = true)
+
+    tdiv(class = "form-group"): 
+      tdiv(class = "col-3 col-sm-12"):
+        label(class = "form-label", `for` = "state-input-vy"): text "Vel Y"
+      tdiv(class = "col-9 col-sm-12"):
+        input(class = "form-input form-inline", `type` = "number", id = "state-input-vy", 
+          readonly = true)
 
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
@@ -1616,21 +1733,21 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
         label(class = "form-label", `for` = "point-input-vx"): text "Vel X"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-vx", 
-          step = state.inputStep, readonly = true)
+          readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "point-input-vy"): text "Vel Y"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-vy", 
-          step = state.inputStep, readonly = true)
+          readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "point-input-s"): text "Speed"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-s", 
-          step = state.inputStep, readonly = true)
+          readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -1655,7 +1772,7 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
 proc renderRightDiv*(state: var ParabolaState): VNode =
-  buildHtml tdiv(class = "column col-4"):
+  buildHtml tdiv(class = "column col-4", style = "overflow: auto; height: 100%;".toCss):
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-1", hidden = true, checked = true)
@@ -1680,7 +1797,8 @@ proc renderRightDiv*(state: var ParabolaState): VNode =
       label(class = "accordion-header", `for` = "accordion-3"):
         italic(class = "icon icon-arrow-right mr-1")
         text "Formulas"
-      tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
+      tdiv(class = "accordion-body", style = 
+        "padding-left: 2em; width: 100%; overflow: auto;".toCss):
         state.renderFormulasAccordion()
 
       #li(class=class({"active": state.currentTab == tPoint}, "tab-item"),
