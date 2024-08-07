@@ -300,27 +300,36 @@ proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryP
       result.index = e
 
 proc updateFormulaAccordion(state: ParabolaState) = 
-  echo "update formulas"
-  let m1 = getElementById("m1")
-  let m2 = getElementById("m2")
-  MathJax.typesetClear([m1, m2])
 
   var siInitialState = state.canon.state.toMu()
   siInitialState.gravity = siInitialState.gravity * gravityFactor
 
-  let h = state.strfloat(siInitialState.height)
-  let voy = state.strfloat(siInitialState.vel.y)
-  let g = state.strfloat(siInitialState.gravity.y)
-  let voySquared = state.strfloat(siInitialState.vel.y ^ 2)
   let gTwice = state.strfloat(2 * siInitialState.gravity.y)
 
-  let m1t = r"\(h_{max} = <h>m + \dfrac{2\:\cdot\:(<voy>m/s)^{2}}{2\:\cdot\:<g>m/s^2}\)".fmt('<', '>')
-  let m2t = r"\(h_{max} = <h>m + \dfrac{2\:\cdot\:<voySquared>m/s^2}{<gTwice>m/s^2}\)".fmt('<', '>')
+  let m1 = getElementById("m1")
+  let m2 = getElementById("m2")
 
-  m1.textContent = cstring m1t
-  m2.textContent = cstring m2t
-  # Render all MathJax expressions asynchronously
-  MathJax.typesetPromise([m1, m2])
+  m1.firstChild.firstChild.children[2].firstChild.innerText = 
+    cstring &"{state.strfloat(siInitialState.height)}m"
+
+  m1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+    firstChild.children[1].children[4].firstChild.innerText = 
+    cstring &"({state.strfloat(siInitialState.vel.y)}m/s)"
+
+  m1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+    children[1].firstChild.children[1].firstChild.children[1].children[4].
+    innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
+
+  m2.firstChild.firstChild.children[2].firstChild.innerText = 
+    cstring &"{state.strfloat(siInitialState.height)}m"
+
+  m2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+    firstChild.children[1].children[4].innerText = 
+    cstring &"({state.strfloat(siInitialState.vel.y ^ 2)}m²/s²)"
+
+  m2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
+    children[1].firstChild.children[1].firstChild.children[1].
+    innerText = cstring &"{state.strfloat(siInitialState.gravity.y * 2)}m/s²"
 
 proc updateStateAccordion(state: ParabolaState) = 
   let siInitialState = state.canon.state.toMu()
@@ -1147,11 +1156,13 @@ proc onImagesLoaded*(state: var ParabolaState) =
 
   state.rendering = true
 
+#proc typesetMathjax(): Future[void] = 
+#  var promise = newPromise() do (resolve: proc()):
+#    # Render all MathJax expressions synchronously
+#    (resolve)
+
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
-  # Render all MathJax expressions asynchronously
-  #MathJax.typesetPromise()
-
   # Load wrap's plugin and load matter aliases to point to the correct values
   Matter.use("matter-wrap")
   loadMatterAliases()
@@ -1250,22 +1261,26 @@ proc load*(state: var ParabolaState) =
     # Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
   ])
 
-  # Wait until all textures are loaded
-  var loadedImgCount = 0
-  var images = newSeq[cstring]()
-  for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
-    if not b.render.sprite.texture.isUndefined and not to(b.render.sprite.texture in state.render.textures, bool):
-      images.add b.render.sprite.texture.to(cstring)
+  # Typeset before loading textures because when the textures are loaded calcTrajectory is called
+  # which updates the formulaAccordion which needs mathjax expressions to be rendered
+  MathJax.typesetPromise().then(proc() = 
+    # Wait until all textures are loaded
+    var loadedImgCount = 0
+    var images = newSeq[cstring]()
+    for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
+      if not b.render.sprite.texture.isUndefined and not to(b.render.sprite.texture in state.render.textures, bool):
+        images.add b.render.sprite.texture.to(cstring)
 
-  for src in images:
-    let img = newImage()
-    img.onload = proc() =
-      inc loadedImgCount
-      if loadedImgCount == images.len:
-        state.onImagesLoaded()
+    for src in images:
+      let img = newImage()
+      img.onload = proc() =
+        inc loadedImgCount
+        if loadedImgCount == images.len:
+          state.onImagesLoaded()
 
-    img.src = src
-    state.render.textures[src] = img
+      img.src = src
+      state.render.textures[src] = img
+  )
 
 ## Reloads the simulation
 proc reload*(state: var ParabolaState) =
@@ -1336,7 +1351,7 @@ proc renderFormulasAccordion*(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "container"):
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
-        id = "accordion-f-1", hidden = true, checked = true)
+        id = "accordion-f-1", hidden = true, checked = false)
       label(class = "accordion-header", `for` = "accordion-f-1"):
         #text "Initial State"
 
@@ -1350,8 +1365,10 @@ proc renderFormulasAccordion*(state: var ParabolaState): VNode =
           
       tdiv(class = "accordion-body", style = "".toCss):
         ul:
-          li(id = "m1", style = "".toCss) # font-size: 1.2em;
-          li(id = "m2")
+          li(id = "m1", style = "".toCss): # font-size: 1.2em;
+            text r"\(h_{max} = h + \dfrac{2\:\cdot\:(v)^{2}}{2\:\cdot\:g}\)"
+          li(id = "m2"):
+            text r"\(h_{max} = h + \dfrac{2\:\cdot\:v}{g}\)"
 
 proc renderStateAccordion*(state: var ParabolaState): VNode =
   let siInitialState = state.canon.state.toMu()
