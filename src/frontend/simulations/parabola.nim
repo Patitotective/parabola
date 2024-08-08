@@ -304,111 +304,127 @@ proc updateFormulaAccordion(state: ParabolaState) =
   siInitialState.gravity = siInitialState.gravity * gravityFactor
   let vySquared = siInitialState.vel.y ^ 2
   let gTwice = siInitialState.gravity.y * 2
-  let vySquaredTwice = vySquared * 2
   let gTimesH = siInitialState.gravity.y * siInitialState.height
+  let gTimesHTwice = 2 * gTimesH
 
-  proc updateMaxHeightFormula() = 
-    let mh1 = getElementById("mh1")
+  let changes = {
+    "#vix > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.vel.x)}m/s",
+    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.speed)}m/s",
+    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-texatom:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{siInitialState.angleDeg:.0f}°",
+    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.vel.x)}m/s",    
 
-    mh1.firstChild.firstChild.children[2].firstChild.innerText = 
-      cstring &"{state.strfloat(siInitialState.height)}m"
+    "#viy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",
+    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.speed)}m/s",
+    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-texatom:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{siInitialState.angleDeg:.0f}°",
+    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",    
 
-    mh1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-      firstChild.children[1].children[4].firstChild.innerText = 
-      cstring &"({state.strfloat(siInitialState.vel.y)}m/s)"
+    "#maxheight > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      if state.trajectory.highestPoint == 0: # Meaning it's pointing downwards
+        let inp = getElementById("maxheight").firstChild
+        inp.checked = false
+        inp.disabled = true
+        "__"
+      else:
+        let inp = getElementById("maxheight").firstChild
+        inp.disabled = false
+        &"{state.strfloat(state.trajectory.maxHeight.toMuDistance)}m",
+    "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.height + (vySquared / gTwice))}m",
+    "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(3)":
+      &"{state.strfloat(vySquared / gTwice)}m",
+    "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height)}m",
+    "#mh2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(gTwice)}m/s²",
+    "#mh2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(vySquared)}m²/s²",
+    "#mh2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height)}m",
+    "#mh1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#mh1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msup:nth-child(1) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(2)":
+       &"{state.strfloat(siInitialState.vel.y)}m/s",
+    "#mh1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height)}m",
 
-    mh1.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-      children[1].firstChild.children[1].firstChild.children[1].children[4].
-      innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
+    "#l_f-2 > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(state.trajectory.totalTime)}s",
+    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-msup:nth-child(1) > mjx-mi:nth-child(1)":
+      &"({state.strfloat(siInitialState.vel.y)}m/s)",
+    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",
+    "mjx-mi.mjx-i:nth-child(9)":
+      &"{state.strfloat(siInitialState.height)}m",
+    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+       &"{state.strfloat(siInitialState.vel.y)}m/s", 
+    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(vySquared)}m²/s²", 
+    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(gTimesH)}m²/s²", 
+    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²", 
+    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(vySquared)}m²/s²", 
+    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+       &"{state.strfloat(siInitialState.vel.y)}m/s", 
+    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(5)": 
+      &"{state.strfloat(gTimesHTwice)}m²/s²",
+    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s", 
+    "#tf4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(vySquared + gTimesHTwice)}",
+    "#tf5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",  
+    "#tf5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(sqrt(vySquared + gTimesHTwice))}m/s",
+    "#tf6 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.vel.y + sqrt(vySquared + gTimesHTwice))}m/s",
+    "#tf6 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf6 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat((siInitialState.vel.y + sqrt(vySquared + gTimesHTwice)) / siInitialState.gravity.y)}s",
+    
+    "#l_f-3 > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m",
+    "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.x)}m/s",
+    "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(state.trajectory.totalTime)}s",
+    "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m",
+  }
 
-    let mh2 = getElementById("mh2")
-
-    mh2.firstChild.firstChild.children[2].firstChild.innerText = 
-      cstring &"{state.strfloat(siInitialState.height)}m"
-
-    mh2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-      firstChild.children[1].children[4].innerText = 
-      cstring &"{state.strfloat(vySquared)}m²/s²"
-
-    mh2.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-      children[1].firstChild.children[1].firstChild.children[1].
-      innerText = cstring &"{state.strfloat(gTwice)}m/s²"
-
-    let mh3 = getElementById("mh3")
-
-    mh3.firstChild.firstChild.children[2].firstChild.innerText = 
-      cstring &"{state.strfloat(siInitialState.height)}m"
-
-    mh3.firstChild.firstChild.children[2].children[2].firstChild.firstChild.
-      firstChild.innerText = cstring &"({state.strfloat(vySquaredTwice)}m²/s²)"
-
-    mh3.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
-      "mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > " & 
-      "mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > " & 
-      "mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)").
-      innerText = cstring &"{state.strfloat(gTwice)}m/s²"
-
-    let mh4 = getElementById("mh4")
-    let upPart = vySquaredTwice / gTwice
-
-    mh4.firstChild.firstChild.children[2].firstChild.innerText = 
-      cstring &"{state.strfloat(siInitialState.height)}m"
-
-    mh4.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
-      "mjx-mrow:nth-child(3) > mjx-mi:nth-child(3)").
-      innerText = cstring &"{state.strfloat(upPart)}m"
-
-    let mh5 = getElementById("mh5")
-    mh5.querySelector("#mh5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
-      "mjx-mi:nth-child(3)").innerText = 
-      cstring &"{state.strfloat(siInitialState.height + upPart)}m"
-
-  proc updateTimeOfFlightFormula() = 
-    let tf1 = getElementById("tf1")
-    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
-      "mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > " & 
-      "mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)").
-      innerText = cstring &"{state.strfloat(siInitialState.vel.y)}m/s"
-
-    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > " & 
-      "mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > " & 
-      "mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > " & 
-      "mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > " & 
-      "mjx-msup:nth-child(1) > mjx-mi:nth-child(1)").innerText = 
-      cstring &"({state.strfloat(siInitialState.vel.y)}m/s)"
-
-    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)").
-      innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
-
-    tf1.querySelector("mjx-mi.mjx-i:nth-child(9)").innerText = 
-      cstring &"{state.strfloat(siInitialState.height)}m"
-
-    tf1.querySelector("mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)").
-      innerText = cstring &"{state.strfloat(siInitialState.gravity.y)}m/s²"
-
-    let changes = {
-      "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
-         &"{state.strfloat(siInitialState.vel.y)}m/s", 
-      "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
-        &"{state.strfloat(vySquared)}m²/s²", 
-      "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
-        &"{state.strfloat(gTimesH)}m²/s²", 
-    }
-
-    for (query, value) in changes:
-      document.querySelector(query).innerText = cstring value
-
-  updateMaxHeightFormula()
-  updateTimeOfFlightFormula()
+  for (query, value) in changes:
+    document.querySelector(query).innerText = cstring value
 
 proc updateStateAccordion(state: ParabolaState) = 
-  let siInitialState = state.canon.state.toMu()
+  var siInitialState = state.canon.state.toMu()
+  siInitialState.gravity = siInitialState.gravity * gravityFactor
 
   getElementById("state-input-h").value = cstring state.strfloat(siInitialState.height)
   getElementById("state-input-a").value = cstring &"{siInitialState.angleDeg:.0f}"
   getElementById("state-input-s").value = cstring state.strfloat(siInitialState.speed)
   getElementById("state-input-vx").value = cstring state.strfloat(siInitialState.vel.x)
   getElementById("state-input-vy").value = cstring state.strfloat(siInitialState.vel.y)
+  getElementById("state-input-g").value = cstring state.strfloat(siInitialState.gravity.y)
 
 proc updatePointAccordion(state: ParabolaState) = 
   let trjctry = state.trajectory
@@ -440,6 +456,37 @@ proc updatePointAccordion(state: ParabolaState) =
     getElementById("point-input-vy").value = ""
     getElementById("point-input-s").value = ""
     #getElementById("point-input-x").setAttribute("disabled", "")
+  var siInitialState = state.canon.state.toMu()
+  siInitialState.gravity = siInitialState.gravity * gravityFactor
+
+  let changes = {
+    "#vy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      if show:
+        let inp = getElementById("vy").firstChild
+        inp.disabled = false
+        &"{state.strfloat(point.vel.y)}m/s"
+      else:
+        let inp = getElementById("vy").firstChild
+        inp.checked = false
+        inp.disabled = true
+        "__",
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(point.time)}s",
+
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.gravity.y * point.time)}m/s³",
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(point.vel.y)}m/s"
+  }
+
+  for (query, value) in changes:
+    document.querySelector(query).innerText = cstring value
 
 proc calcTrajectory(state: var ParabolaState) =
   var initialState = state.canon.state
@@ -726,6 +773,7 @@ proc onCollisionStart(state: var ParabolaState, event: JsObject) =
 
             if state.trajectory.followBullet:
               state.trajectory.pinnedPoint = state.trajectory.points.high
+              state.trajectory.closestPoint = state.trajectory.pinnedPoint
               state.updatePointAccordion()
 
       for i in countdown(toDelete.high, toDelete.low):
@@ -1413,65 +1461,92 @@ proc renderLeftDiv*(state: var ParabolaState): VNode =
 
     #br()
 
-    canvas(id = "canvas", style = fmt"height: 100%; width: 100%; min-width: 500px; min-height: 300px; background: rgb(20, 21, 31)".toCss):
+    # tabindex makes it able to focus the canvas
+    canvas(id = "canvas", style = toCss "height: 100%; width: 100%; min-width: 500px;" & 
+      "min-height: 300px; background: rgb(20, 21, 31)", tabindex = "0"):
       #style = fmt"width: 100vw; min-width: 500px height: 65vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
       text "Matter-js simulation"
+      proc onclick(e: Event, n: VNode) = 
+        n.dom.focus()
 
 proc renderFormulasAccordion*(state: var ParabolaState): VNode =
-  let siInitialState = state.canon.state.toMu()
   let liStyle = "margin-top: 20px;".toCss
-  let bodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
+  let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
   buildHtml tdiv(class = "container"):
-    tdiv(class = "accordion"):
+    tdiv(id = "vix", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f--1", hidden = true, checked = false)
+      label(class = "accordion-header tooltip tooltip-bottom", `for` = "accordion-f--1", `data-tooltip` = "Initial vel X"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(v_{ix} = v\:\cdot\:\cos{\alpha} = d\)"
+
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(v_{ix} = v\:\cdot\:\cos{a} = d\)"
+    
+    tdiv(id = "viy", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-0", hidden = true, checked = false)
+      label(class = "accordion-header tooltip", `for` = "accordion-f-0", `data-tooltip` = "Initial vel Y"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(v_{iy} = v\:\cdot\:\sin{\alpha} = d\)"
+
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(v_{iy} = v\:\cdot\:\sin{a} = d\)"
+
+    tdiv(id = "maxheight", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-1", hidden = true, checked = false)
-      label(class = "accordion-header", `for` = "accordion-f-1"):
-        tdiv(class = "columns", style = "align-items: center;".toCss):
-          tdiv(class = "column"):
-            italic(class = "icon icon-arrow-right mr-1")
-            text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g}\)"
+      label(class = "accordion-header tooltip", `for` = "accordion-f-1", `data-tooltip` = "Max height"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g} = d\)"
 
-          tdiv(class = "column col-3"):
-            text "Max height"
-          
-      tdiv(class = "accordion-body", style = bodyStyle):
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
           li(id = "mh1"): # font-size: 1.2em;
-            text r"\(h_{max} = h + \dfrac{2\:\cdot\:(v)^{2}}{2\:\cdot\:g}\)"
+            text r"\(h_{max} = h + \dfrac{(v)^{2}}{2\:\cdot\:g}\)"
           li(id = "mh2", style = liStyle):
-            text r"\(h_{max} = h + \dfrac{2\:\cdot\:v}{g}\)"
-          li(id = "mh3", style = liStyle):
             text r"\(h_{max} = h + \dfrac{v}{g}\)"
           li(id = "mh4", style = liStyle):
-            text r"\(h_{max} = h + a\)"
-          li(id = "mh5", style = liStyle):
-            text r"\(h_{max} = h\)"
+            text r"\(h_{max} = h + a = d\)"
 
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-2", hidden = true, checked = false)
-      label(class = "accordion-header", `for` = "accordion-f-2"):
-        tdiv(class = "columns", style = "align-items: center;".toCss):
-          tdiv(class = "column"):
-            italic(class = "icon icon-arrow-right mr-1")
-            text r"\(t_{f} = \dfrac{v_{iy}\:+\:\sqrt{v_{iy}^{2}\:+\:2gh}}{g}\)"
+      label(id = "l_f-2", class = "accordion-header tooltip", `for` = "accordion-f-2", `data-tooltip` = "Time of flight"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(t_{f} = \dfrac{v_{iy}\:+\:\sqrt{v_{iy}^{2}\:+\:2gh}}{g} = d\)"
 
-          tdiv(class = "column col-3"):
-            text "Time of flight"
-          
-      tdiv(class = "accordion-body", style = bodyStyle):
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
           li(id = "tf1"): # font-size: 1.2em;
             text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v^{2}\:+\:2\:\cdot\:g\:\cdot\:h}}{g}\)"
           li(id = "tf2", style = liStyle):
             text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v\:+\:2\:\cdot\:a}}{g}\)"
           li(id = "tf3", style = liStyle):
-            text r"\(h_{max} = h + \dfrac{v}{g}\)"
+            text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v\:+\:a}}{g}\)"
           li(id = "tf4", style = liStyle):
-            text r"\(h_{max} = h + a\)"
+            text r"\(t_{f} = \dfrac{v\:+\:\sqrt{bm²/s²}}{g}\)"
           li(id = "tf5", style = liStyle):
-            text r"\(h_{max} = h\)"
+            text r"\(t_{f} = \dfrac{v\:+\:e}{g}\)"
+          li(id = "tf6", style = liStyle):
+            text r"\(t_{f} = \dfrac{c}{g} = d\)"
+
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-3", hidden = true, checked = false)
+      label(id = "l_f-3", class = "accordion-header tooltip", `for` = "accordion-f-3", `data-tooltip` = "Max range"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(x_{max} = v_{ix}\:\cdot\:t_f = d\)"
+
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(id = "maxRange", style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(x_{max} = v\:\cdot\:t = d\)"
 
 proc renderStateAccordion*(state: var ParabolaState): VNode =
   let siInitialState = state.canon.state.toMu()
@@ -1511,6 +1586,17 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
     state.canon.state.setSpeed(s)
     state.calcTrajectory()
   
+  proc onInputGChange(e: Event, n: VNode) = 
+    if not state.rendering: return
+
+    var g = 0.0
+
+    discard parseFloat($n.value, g)
+    g = g.clamp(3, 30).fromMuAcceleration().round(state.floatPrecision)
+    state.canon.state.gravity.y = g / gravityFactor
+    state.engine.gravity.y = state.canon.state.gravity.y
+    state.calcTrajectory()
+  
   buildHtml form(class = "form-horizontal"):
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -1546,6 +1632,13 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-vy", 
           readonly = true)
+    
+    tdiv(class = "form-group"): 
+      tdiv(class = "col-3 col-sm-12"):
+        label(class = "form-label", `for` = "state-input-g"): text "Gravity"
+      tdiv(class = "col-9 col-sm-12"):
+        input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
+          step = state.inputStep, onchange = onInputGChange)
 
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
@@ -1568,6 +1661,9 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
   elif not state.trajectory.dragging and state.trajectory.pinnedPoint in state.trajectory.points:
     show = true
     point = state.trajectory.points[state.trajectory.pinnedPoint].toMu()
+
+  let liStyle = "margin-top: 20px;".toCss
+  let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
   proc onInputXChange(ev: Event, n: VNode) = 
     if not state.rendering or state.trajectory.points.len == 0: return
@@ -1769,10 +1865,23 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
 
-    # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
+    tdiv(id = "vy", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-vy", hidden = true, checked = false)
+      label(class = "accordion-header tooltip", `for` = "accordion-f-vy", `data-tooltip` = "Velocity Y"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(v_{y} = v_{iy}\:-\:g\:\cdot\:t = d\)"
+
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(v_{y} = v\:-\:g\:\cdot\:t\)"
+          li(style = liStyle): 
+            text r"\(v_{y} = v\:-\:a = b\)"
 
 proc renderRightDiv*(state: var ParabolaState): VNode =
-  buildHtml tdiv(class = "column col-4", style = "overflow: auto; height: 100%;".toCss):
+  buildHtml tdiv(class = "column col-4", style = toCss "overflow: auto; height: 100%; " & 
+      "scrollbar-width: thin;"):
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-1", hidden = true, checked = true)
@@ -1834,8 +1943,11 @@ proc addEventListeners*(state: var ParabolaState) =
   )
 
   document.addEventListener("keyup", proc(event: Event) =
-    if not state.rendering or (not document.activeElement.isNil and 
-      document.activeElement.nodename == "INPUT"): return
+    if not state.rendering or
+      #(not document.activeElement.isNil and document.activeElement.nodename == "INPUT"): 
+      (not document.activeElement.isNil and document.activeElement.id != "canvas"): 
+      return
+
 
     let event = KeyboardEvent(event)
     #echo $event.key
