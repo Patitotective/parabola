@@ -5,11 +5,6 @@ import karax/[karax, karaxdsl, vdom, vstyles]
 import matter, utils, mouseconstraint
 
 type
-  CanonStatus = enum
-    #csReady # Not launched yet
-    csFlight # In the air
-    csHit # Hit something and stopped
-
   CanonState = object
     angleDeg*: float
     angleRad*: float
@@ -24,26 +19,23 @@ type
     imgSize*: Vec
 
   TrajectoryPoint = object
-    ## pos is according to matter-js update body function
-    ## acutalPos uses the high school level projectile motion formulas
     pos*, vel*: Vec
     time*, speed*: float
 
   Trajectory = object
+    state*: CanonState
     points*: seq[TrajectoryPoint]
     highestPoint*: int
     closestPoint*: int # Closest point to the mouse
-    #initialState*: CanonState
     extraPoint*: int # When you change a variable through the inputs, a new point
     # is created with the exact value you entered. This field points to its index
     pinnedPoint*: int
-    dragging*: bool # Is the pinned point being dragged
-    followBullet*: bool # Have closestPoint follow the bullet
+    color*: int # Index of trajectoryStrokeStyles
 
   Canon = object
     platform*: CanonPlatform
     #status*: CanonStatus
-    state*: CanonState
+    #state*: CanonState
     base*: CanonBase
 
     body*: JsObject
@@ -64,79 +56,78 @@ type
     body*: JsObject
     imgSize*: Vec
 
-  Tab = enum
-    tState, tPoint
-
   ParabolaState* = object
     engine*: JsObject
     render*: JsObject
     runner*: JsObject
     canvas*: Element
 
+    # paused is true when the user pauses the simulation
     paused*: bool
+    # frozen is true when the simulation pauses itself since there's no movement
+    frozen*: bool
 
     mouse*: JsObject
     mouseCons*: JsObject
     timeAtClick*: Time # the value of getTime() when left-click, used to check double click
 
     canon*: Canon
-    trajectory*: Trajectory
     thingy*: JsObject
     ground*: JsObject
+
+    trajectories*: seq[Trajectory]
+    currentTrajectory*: int
+    draggingPoint*: bool # Is the pinned point being dragged
+    followBullet*: bool # Have closestPoint follow the bullet
 
     bounds*: JsObject
     boundsScale*: JsObject
     boundsScaleTarget*: float
 
-    currentTab*: Tab
-
     onMousedown*, onMouseup*, onMousemove*, 
       onMouseleave*, onWheel*: proc(event: JsObject)
 
     floatPrecision*: range[0..8]
-    rendering*: bool
+    startedRendering*: bool
 
-proc totalTime(t: Trajectory): float = 
-  if t.points.len > 0:
-    result = t.points[^1].time
+template totalTime(t: Trajectory): float = 
+  t.points[^1].time
 
-proc maxRange(t: Trajectory): float = 
-  if t.points.len > 0:
-    result = t.points[^1].pos.x
+template maxRange(t: Trajectory): float = 
+  t.points[^1].pos.x
 
-proc maxHeight(t: Trajectory): float = 
-  if t.points.len > 0 and t.highestPoint in t.points:
-    result = t.points[t.highestPoint].pos.y
+template maxHeight(t: Trajectory): float = 
+  t.points[t.highestPoint].pos.y
 
 # Projectile motion equations
-proc calcTotalTime*(initialState: CanonState): float = 
+proc calcTotalTime(initialState: CanonState): float = 
   (initialState.vel.y + sqrt(initialState.vel.y^2 + 
     2 * initialState.gravity.y * initialState.height)) / initialState.gravity.y
 
-proc calcMaxRange*(initialState: CanonState): float = 
+proc calcMaxRange(initialState: CanonState): float = 
   initialState.vel.x * initialState.calcTotalTime()
 
-proc calcMaxHeight*(initialState: CanonState): float = 
+proc calcMaxHeight(initialState: CanonState): float = 
   initialState.height + (initialState.vel.y^2 / (2*initialState.gravity.y))
 
-proc calcX*(initialState: CanonState, t: float): float = 
+proc calcX(initialState: CanonState, t: float): float = 
   t * initialState.vel.x
 
-proc calcY*(initialState: CanonState, t: float): float = 
+proc calcY(initialState: CanonState, t: float): float = 
   initialState.height + (t * initialState.vel.y) - 
     (initialState.gravity.y * t^2) / 2
 
-proc calcPos*(initialState: CanonState, t: float): Vec = 
+proc calcPos(initialState: CanonState, t: float): Vec = 
   vec(initialState.calcX(t), initialState.calcY(t))
 
-proc calcVel*(initialState: CanonState, t: float): Vec = 
+proc calcVel(initialState: CanonState, t: float): Vec = 
   vec(initialState.vel.x, 
     initialState.vel.y - (initialState.gravity.y * t))
 
-proc calcTime*(initialState: CanonState, x: float): float = 
+proc calcTime(initialState: CanonState, x: float): float = 
   x / initialState.vel.x
 
-proc calcTime*(initialState: CanonState, y: float, sign: bool): float = 
+proc calcTime(initialState: CanonState, y: float, sign: bool): float = 
   if sign:
     -(initialState.vel.y + sqrt(
       initialState.vel.y^2 - (2 * initialState.gravity.y * initialState.height) + 
@@ -148,12 +139,12 @@ proc calcTime*(initialState: CanonState, y: float, sign: bool): float =
       (2 * initialState.gravity.y * y)
     )) / initialState.gravity.y
 
-proc magnitude*(v: Vec): float = 
+proc magnitude(v: Vec): float = 
   sqrt(v.x^2 + v.y^2)
 
 const
   fps = 60
-  timeScale = 0.022
+  timeScale = 0.025
   delta = (1000 / fps) * timeScale # 60fps, 60 times in one second (1000 milliseconds)
 
   # For some reason if you use the projectile motion formulas with matter-js
@@ -172,7 +163,9 @@ const
   canonBaseTexture = "/public/img/canonBase.png"
   canonPlatformTexture = "/public/img/canonPlatform.png"
 
-  trajectoryStrokeStyle = "orange"
+  trajectoryStrokeStyles = ["Orange", "Salmon", "Crimson", "Pink", "HotPink", "Tomato", 
+  "Gold", "Khaki", "Violet", "SlateBlue", "YellowGreen", "LightSeaGreen", 
+  "SkyBlue"]
   trajectoryLineWidth = 2
   trajectoryPointRadius = 7 # The radius of the trajectory point hovered by the mouse
   
@@ -192,6 +185,19 @@ proc initCanonState(angle: float, deg = false, speed: float,
   result = CanonState(angleDeg: angleDeg, angleRad: angleRad, 
     gravity: gravity, height: height)
   result.setSpeed(speed)
+
+proc initTrajectory(): Trajectory = 
+  Trajectory(closestPoint: -1, highestPoint: -1, pinnedPoint: -1, extraPoint: -1, 
+    state: initCanonState(0, deg = true, 
+      canonInitialSpeed, gravity = vec(0, (9.807 * muMeterFactor) / 
+        gravityFactor))
+  )
+
+template trajectory(state: ParabolaState): Trajectory = 
+  state.trajectories[state.currentTrajectory]
+
+#proc trajectory(state: var ParabolaState): var Trajectory = 
+#  state.trajectories[state.currentTrajectory]
 
 proc getPos(state: ParabolaState, p: TrajectoryPoint): Vec = 
   ## Converts p.pos into matter-js coordinates
@@ -230,6 +236,34 @@ proc inputStep(state: ParabolaState): string =
     &"0.{'0'.repeat(state.floatPrecision-1)}1"
   else: "1" 
 
+proc pause(state: var ParabolaState) = 
+  state.runner.enabled = false
+  state.paused = true
+
+proc unpause(state: var ParabolaState) = 
+  state.runner.enabled = true
+  state.paused = false
+
+proc freeze(state: var ParabolaState) = 
+  state.pause()
+  Render.stop(state.render)
+  # I realized that sometimes the canvas would go blank when it froze so I
+  # thought the render might stop and leave the canvas blank so we run it once
+  # here to be sure there's something on the canvas
+  state.render.runOnce()
+  state.frozen = true
+
+proc unfreeze(state: var ParabolaState) = 
+  state.unpause()
+  Render.run(state.render)
+  state.frozen = false
+
+proc togglePause(state: var ParabolaState) = 
+  if state.paused:
+    state.unpause()
+  else:
+    state.pause()
+
 ## Since a body's angle can be negative and can be higher than 360, this procedure makes it so it's always positive and inside 0..359
 proc normalizeAngle(rad: float, p = false): float =
   result = rad.radToDeg().round(0)
@@ -242,20 +276,25 @@ proc normalizeAngle(rad: float, p = false): float =
       360 - result
     else: result
 
+proc normalizedAngleDeg(canon: Canon, extraRad = 0.0): float = 
+  normalizeAngle(canon.body.angle.to(float) + extraRad)
+
 proc rotationLimit(state: ParabolaState): Slice[float] = 
-  if state.canon.state.height > state.canon.imgSize.x:
+  if state.trajectory.state.height > state.canon.imgSize.x:
     (0.0)..(360.0)
-  elif state.canon.state.height > (state.canon.imgSize.y / 2):
+  elif state.trajectory.state.height > (state.canon.imgSize.y / 2):
     0.0..180.0
   else:
     angleLowerLimit..(180.0-angleLowerLimit)
 
 proc rotateCanon(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), limit = true) =
+  if rad == 0: return
+
   var rad = rad
   if limit:
     let rotationLimit = state.rotationLimit()
 
-    let desiredAngleDeg = normalizeAngle(state.canon.body.angle.to(float) + rad)
+    let desiredAngleDeg = state.canon.normalizedAngleDeg(extraRad = rad)
     if desiredAngleDeg notin rotationLimit:
       let lowerLimit = 
         if desiredAngleDeg > 180: 360.0 + rotationLimit.a
@@ -263,20 +302,18 @@ proc rotateCanon(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), 
 
       if abs(desiredAngleDeg - lowerLimit) < 
         abs(desiredAngleDeg - rotationLimit.b):
-        rad = degToRad(normalizeAngle(state.canon.body.angle.to(float)) - 
+        rad = degToRad(state.canon.normalizedAngleDeg() - 
           rotationLimit.a)
       else:
-        rad = degToRad(normalizeAngle(state.canon.body.angle.to(float)) - 
+        rad = degToRad(state.canon.normalizedAngleDeg() - 
           rotationLimit.b)
-
-    #echo (d: desiredAngleDeg, r: radToDeg(rad))
 
   Body.rotate(state.canon.body, rad, state.canon.pivot.jsVec)
 
-  state.canon.state.angleDeg = normalizeAngle(state.canon.body.angle.to(float))
-  state.canon.state.angleRad = degToRad(float state.canon.state.angleDeg)
-  state.canon.state.vel = speedToVelRad(state.canon.state.speed, 
-    state.canon.state.angleRad)
+  state.trajectory.state.angleDeg = state.canon.normalizedAngleDeg()
+  state.trajectory.state.angleRad = degToRad(float state.trajectory.state.angleDeg)
+  state.trajectory.state.vel = speedToVelRad(state.trajectory.state.speed, 
+    state.trajectory.state.angleRad)
 
 proc rotateCanonBack(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), limit = true) =
   state.rotateCanon(-rad, limit)
@@ -286,7 +323,7 @@ proc nextBullet(state: var ParabolaState): JsObject =
     state.canon.pivot.x, state.canon.pivot.y, 
     state.canon.bulletRadius, state.canon.bulletOptions
   )
-  Body.setAngle(result, state.canon.state.angleDeg)
+  Body.setAngle(result, state.trajectory.state.angleDeg)
   Body.setInertia(result, Infinity)
 
 proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryPoint): T): tuple[index: int, exactMatch: bool] = 
@@ -299,8 +336,40 @@ proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryP
       closestDistance = d
       result.index = e
 
-proc updateFormulaAccordion(state: ParabolaState) = 
-  var siInitialState = state.canon.state.toMu()
+proc toggleFormula(ele: Element, to: bool, trueVal: string, falseVal = "__"): string = 
+  let inp = ele.firstChild
+  let label = ele.children[1]
+  let icon = Element label.firstChild
+
+  if not to:
+    inp.checked = false
+    inp.disabled = true
+
+    if label.hasAttribute("data-tooltip"):
+      if not label.hasAttribute("old-data-tooltip"):
+        label.setAttr("old-data-tooltip", label.getAttribute("data-tooltip"))
+
+      if label.hasAttribute("disabled-data-tooltip"):
+        label.setAttr("data-tooltip", label.getAttribute("disabled-data-tooltip"))
+
+    icon.classList.remove("icon-arrow-right")
+    icon.classList.add("icon-cross")
+
+    falseVal
+  else:
+    inp.disabled = false
+
+    if label.hasAttribute("data-tooltip"):
+      if label.hasAttribute("old-data-tooltip"):
+        label.setAttr("data-tooltip", label.getAttribute("old-data-tooltip"))
+
+    icon.classList.remove("icon-cross")
+    icon.classList.add("icon-arrow-right")
+
+    trueVal
+
+proc updateFormulaAccordion(state: var ParabolaState) = 
+  var siInitialState = state.trajectory.state.toMu()
   siInitialState.gravity = siInitialState.gravity * gravityFactor
   let vySquared = siInitialState.vel.y ^ 2
   let gTwice = siInitialState.gravity.y * 2
@@ -327,15 +396,8 @@ proc updateFormulaAccordion(state: ParabolaState) =
       &"{state.strfloat(siInitialState.vel.y)}m/s",    
 
     "#maxheight > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      if state.trajectory.highestPoint == 0: # Meaning it's pointing downwards
-        let inp = getElementById("maxheight").firstChild
-        inp.checked = false
-        inp.disabled = true
-        "__"
-      else:
-        let inp = getElementById("maxheight").firstChild
-        inp.disabled = false
-        &"{state.strfloat(state.trajectory.maxHeight.toMuDistance)}m",
+      toggleFormula(getElementById("maxheight"), state.trajectory.highestPoint != 0, 
+        &"{state.strfloat(state.trajectory.maxHeight.toMuDistance)}m"),
     "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
       &"{state.strfloat(siInitialState.height + (vySquared / gTwice))}m",
     "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(3)":
@@ -415,8 +477,11 @@ proc updateFormulaAccordion(state: ParabolaState) =
   for (query, value) in changes:
     document.querySelector(query).innerText = cstring value
 
-proc updateStateAccordion(state: ParabolaState) = 
-  var siInitialState = state.canon.state.toMu()
+  if state.frozen:
+    state.unfreeze()
+
+proc updateStateAccordion(state: var ParabolaState) = 
+  var siInitialState = state.trajectory.state.toMu()
   siInitialState.gravity = siInitialState.gravity * gravityFactor
 
   getElementById("state-input-h").value = cstring state.strfloat(siInitialState.height)
@@ -426,20 +491,20 @@ proc updateStateAccordion(state: ParabolaState) =
   getElementById("state-input-vy").value = cstring state.strfloat(siInitialState.vel.y)
   getElementById("state-input-g").value = cstring state.strfloat(siInitialState.gravity.y)
 
-proc updatePointAccordion(state: ParabolaState) = 
-  let trjctry = state.trajectory
-  var show = false
-  var point: TrajectoryPoint
+  if state.frozen:
+    state.unfreeze()
 
+proc currentPoint(state: ParabolaState): (bool, TrajectoryPoint) = 
   # If followBullet and the bullet is in flight or
   # you're dragging the point
-  if (trjctry.followBullet and state.canon.flyingBullets.len > 0) or 
-    trjctry.dragging and trjctry.closestPoint in trjctry.points:
-    show = true
-    point = trjctry.points[trjctry.closestPoint].toMu()
-  elif not trjctry.dragging and trjctry.pinnedPoint in trjctry.points:
-    show = true
-    point = trjctry.points[trjctry.pinnedPoint].toMu()
+  if state.trajectory.closestPoint in state.trajectory.points and (state.followBullet and 
+    state.canon.flyingBullets.len > 0 or state.draggingPoint):
+    result = (true, state.trajectory.points[state.trajectory.closestPoint].toMu())
+  elif not state.draggingPoint and state.trajectory.pinnedPoint in state.trajectory.points:
+    result = (true, state.trajectory.points[state.trajectory.pinnedPoint].toMu())
+
+proc updatePointAccordion(state: var ParabolaState) = 
+  let (show, point) = state.currentPoint()
 
   if show:
     getElementById("point-input-x").value = cstring state.strfloat(point.pos.x)
@@ -456,20 +521,55 @@ proc updatePointAccordion(state: ParabolaState) =
     getElementById("point-input-vy").value = ""
     getElementById("point-input-s").value = ""
     #getElementById("point-input-x").setAttribute("disabled", "")
-  var siInitialState = state.canon.state.toMu()
+  var siInitialState = state.trajectory.state.toMu()
   siInitialState.gravity = siInitialState.gravity * gravityFactor
 
   let changes = {
+    "#x > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      getElementById("x").toggleFormula(show, &"{state.strfloat(point.pos.x)}m"),
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(point.time)}s",
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.vel.x)}m/s",
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(point.pos.x)}m",
+
+    "#y > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      getElementById("y").toggleFormula(show, &"{state.strfloat(point.pos.y)}m"),
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height)}m",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(point.time)}s",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",  
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msup:nth-child(5) > mjx-mi:nth-child(1)":
+      &"({state.strfloat(point.time)}s)",
+
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height)}m",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(point.time * siInitialState.vel.y)}m",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",  
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(point.time ^ 2)}s²",
+
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(3) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height + (point.time * siInitialState.vel.y))}m",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(3) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(5) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mi:nth-child(2)":
+      &"{state.strfloat(siInitialState.gravity.y * (point.time ^ 2))}m",  
+
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+      &"{state.strfloat(siInitialState.height + (point.time * siInitialState.vel.y))}m",
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+      &"{state.strfloat((siInitialState.gravity.y * (point.time ^ 2)) / 2)}m",  
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+      &"{state.strfloat(point.pos.y)}m",
+
     "#vy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      if show:
-        let inp = getElementById("vy").firstChild
-        inp.disabled = false
-        &"{state.strfloat(point.vel.y)}m/s"
-      else:
-        let inp = getElementById("vy").firstChild
-        inp.checked = false
-        inp.disabled = true
-        "__",
+      getElementById("vy").toggleFormula(show, &"{state.strfloat(point.vel.y)}m/s"),
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
@@ -480,7 +580,7 @@ proc updatePointAccordion(state: ParabolaState) =
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.gravity.y * point.time)}m/s³",
+      &"{state.strfloat(siInitialState.gravity.y * point.time)}m/s",
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
       &"{state.strfloat(point.vel.y)}m/s"
   }
@@ -488,16 +588,25 @@ proc updatePointAccordion(state: ParabolaState) =
   for (query, value) in changes:
     document.querySelector(query).innerText = cstring value
 
+  if state.frozen:
+    state.unfreeze()
+
 proc calcTrajectory(state: var ParabolaState) =
-  var initialState = state.canon.state
+  var initialState = state.trajectory.state
   initialState.gravity = initialState.gravity * gravityFactor
 
   let downwards = initialState.angleDeg > 180 and initialState.angleDeg < 360
 
+  # Was the pinned point the highest or the last point?
+  let prevHighestPoint = state.trajectory.pinnedPoint in state.trajectory.points and 
+    state.trajectory.highestPoint == state.trajectory.pinnedPoint
+  let prevLastPoint = state.trajectory.pinnedPoint in state.trajectory.points and 
+    state.trajectory.points.high == state.trajectory.pinnedPoint
+
   var highest = (index: 0, y: 0.0)
 
   state.trajectory.points.setLen(0)
-  for t in countthrough(0.0, initialState.calcTotalTime(), step = delta / 50):
+  for t in countthrough(0.0, initialState.calcTotalTime(), step = delta / 20):
     var point: TrajectoryPoint
     with point:
       time = t.round(state.floatPrecision)
@@ -528,6 +637,11 @@ proc calcTrajectory(state: var ParabolaState) =
   with state.trajectory.points[^1]:
     pos = vec(initialState.calcMaxRange().round(state.floatPrecision), 0)
 
+  if prevHighestPoint and not downwards:
+    state.trajectory.pinnedPoint = highest.index
+  elif prevLastPoint:
+    state.trajectory.pinnedPoint = state.trajectory.points.high
+
   state.updatePointAccordion()
   state.updateStateAccordion()
   state.updateFormulaAccordion()
@@ -549,15 +663,14 @@ proc moveCanonTo(state: var ParabolaState, y: float = -1, first = false) =
   let canonPrevAngle = state.canon.body.angle.to(float) 
   state.rotateCanon(-canonPrevAngle, limit = false)
 
-  let baseYRange = state.baseYRange
   let desiredBaseY = 
     if y < 0:
-      if first: baseYRange.b
+      if first: state.baseYRange.b
       else: state.canon.base.body.getY()
     else:
       y
 
-  let baseY = clamp(desiredBaseY, baseYRange)
+  let baseY = clamp(desiredBaseY, state.baseYRange)
   state.canon.base.body.setY baseY
 
   let canonY = clamp(baseY - state.canonYDiff, state.canonYRange)
@@ -566,14 +679,16 @@ proc moveCanonTo(state: var ParabolaState, y: float = -1, first = false) =
   state.canon.body.setPos canonX, canonY
   
   state.canon.pivot = vec(state.canon.base.body.getX(), canonY)
-  state.canon.state.height = state.canvas.clientHeight.float - groundHeight.float - canonY
+  state.trajectory.state.height = state.canvas.clientHeight.float - groundHeight.float - canonY
 
   let platformY = (baseY * 1.02) + (state.canon.platform.imgSize.y / 2)
   state.canon.platform.body.setY platformY
 
   state.rotateCanon(canonPrevAngle, limit = false)
 
-proc onResize(state: var ParabolaState, trajectory = true, first = false) = 
+proc onResize(state: var ParabolaState, first = false) = 
+  if not first and not state.startedRendering: return 
+
   state.render.canvas.width = state.canvas.clientWidth
   state.render.canvas.height = state.canvas.clientHeight
 
@@ -602,26 +717,58 @@ proc onResize(state: var ParabolaState, trajectory = true, first = false) =
   state.moveCanonTo(y, 
     first = first)
 
-  state.updateStateAccordion()
-
-  if trajectory:
+  if not first:
     state.calcTrajectory()
 
 #proc `bullet`(canon: Canon): JsObject = 
 #  assert canon.currentBullet in canon.bullets, &"Invalid bullet index {canon.currentBullet}"
-#  canon.bullets[canon.currentBullet]
+#  canon.bullets[canon.currentBullet]    
 
 proc fireBullet(state: var ParabolaState) = 
   let bullet = state.nextBullet()
+
+  for b in state.canon.flyingBullets:
+    # Do not fire bullets at the same time, since if they are in the same position
+    # You probably are firing them too quickly or while paused
+    if state.canon.bullets[b].getPos() == bullet.getPos():
+      return
+
+  const limit = 10
+  # If the limit is exceed by the double, remove half of the bullets
+  if state.canon.bullets.len > limit * 2:
+    var toDelete: seq[int]
+    for i in countup(0, state.canon.bullets.high - limit):
+      Composite.remove(state.engine.world, state.canon.bullets[i])
+      toDelete.add i
+
+    for i in countdown(toDelete.high, toDelete.low):
+      state.canon.bullets.delete(toDelete[i])
+      if (let a = state.canon.flyingBullets.find(toDelete[i]); a >= 0):
+        state.canon.flyingBullets.delete(a)
+
+    if toDelete.len > 0:
+      # Lower each index by the number of bullets deleted since we deleted one
+      for i in state.canon.flyingBullets.mitems:
+        for di in toDelete:
+          if i > di:
+            dec i
+
+  elif state.canon.bullets.len > limit:
+    for i in countup(0, state.canon.bullets.high - limit):
+      state.canon.bullets[i].collisionFilter.mask = 0
+      # If the bullet of index 0 is in flyingBullets, delete it
+      if (let a = state.canon.flyingBullets.find(i); a >= 0):
+        state.canon.flyingBullets.delete(a)
 
   Composite.add(state.engine.world, bullet)
   state.canon.bullets.add bullet
   state.canon.flyingBullets.add state.canon.bullets.high
 
-  let vel = state.canon.state.vel
-
   # Invert vel y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVec(vel.x, -vel.y))
+  Body.setVelocity(bullet, jsVec(state.trajectory.state.vel.x, -state.trajectory.state.vel.y))
+
+  if state.frozen:
+    state.unfreeze()
 
 proc calcClosestTrajectoryPoint(state: var ParabolaState, point: Vec, minRange = false) = 
   ## Calculates the closest trajectory point to point
@@ -721,57 +868,82 @@ proc initParabolaState*(): ParabolaState =
     boundsScale: JsObject{x: 1, y: 1},
     boundsScaleTarget: 1, 
     floatPrecision: 2,
-    canon: Canon(
-      state: initCanonState(0, deg = true, 
-        canonInitialSpeed, gravity = vec(0, (9.807 * muMeterFactor) / 
-          gravityFactor)), 
-      bulletRadius: 20,
-      showAngle: true,
+    canon: Canon(bulletRadius: 20, 
       bulletOptions: JsObject{
         zIndex: 0, isStatic: false, frictionAir: 0, friction: 1, frictionStatic: 1, 
-        collisionFilter: JsObject{mask: 0}
+        collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: "bullet",
       }),
-    trajectory: Trajectory(  
-      closestPoint: -1, highestPoint: -1, pinnedPoint: -1, extraPoint: -1),
+    trajectories: @[initTrajectory()],
   )
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
-  if state.paused: return
+  try:
+    if state.canon.flyingBullets.len > 0:
+      if state.followBullet and not state.paused:
+        state.calcClosestTrajectoryPointToBullet()
+        state.updatePointAccordion()
 
-  if state.canon.flyingBullets.len > 0:
-    #let bullet = state.canon.bullets[state.canon.flyingBullets[^1]]
+      # Sequence of bullets to delete from bullets since they went under the floor
+      var toDelete: seq[int]
+      for e, b in state.canon.bullets:
+        # If the bullet is above the floor, make it able to collide with the ground
+        if b.getY > state.canvas.clientHeight.float + b.circleRadius.to(float):
+          Composite.remove(state.engine.world, b)
+          toDelete.add e
 
-    if state.trajectory.followBullet and not state.paused:
-      state.calcClosestTrajectoryPointToBullet()
-      state.updatePointAccordion()
+        elif e in state.canon.flyingBullets and b.collisionFilter.mask == 0.toJs and
+          b.getY < state.canvas.clientHeight.float - 
+          groundHeight - (b.circleRadius.to(float)):
 
-    for bi in state.canon.flyingBullets:
-      let b = state.canon.bullets[bi]
-      # If the bullet is above the floor, make it able to collide with the ground
-      if b.collisionFilter.mask == 0.toJs and
-        b.getY < state.canvas.clientHeight.float - 
-        groundHeight - (b.circleRadius.to(float)):
+          b.collisionFilter.mask = 2
 
-        b.collisionFilter.mask = 2
+      for i in countdown(toDelete.high, toDelete.low):
+        state.canon.bullets.delete(toDelete[i])
+        if (let a = state.canon.flyingBullets.find(toDelete[i]); a >= 0):
+          state.canon.flyingBullets.delete(a)
 
-  for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
-    if b.speed.to(float) > 1000:
-      Body.setSpeed(b, 10)
+      if toDelete.len > 0:
+        # Lower each index by the number of bullets deleted since we deleted one
+        for i in state.canon.flyingBullets.mitems:
+          for di in toDelete:
+            if i > di:
+              dec i
+
+    # Freeze the simulation if every non-static body is sleeping
+    var freeze = true
+    for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
+      if not b.isSleeping.to(bool) and not b.isStatic.to(bool):
+        freeze = false
+
+      if b.speed.to(float) > 1000:
+        Body.setSpeed(b, 10)
+    
+    if freeze and not state.canon.base.dragging and not state.canon.dragging and 
+      not state.draggingPoint and not (state.followBullet and state.canon.flyingBullets.len > 0):
+      state.freeze()
+  except:
+    state.pause()
+    raise
 
 proc onCollisionStart(state: var ParabolaState, event: JsObject) = 
   if state.canon.flyingBullets.len > 0:
     for pair in items(event.pairs):
+      # Sequence of bullets to delete from flyingBullets since the mouse
+      # constraint grabbed them
       var toDelete: seq[int]
       for i, bi in state.canon.flyingBullets:
         let b = state.canon.bullets[bi]
         if pair.bodyA.id == b.id or pair.bodyB.id == b.id:
-          let floorCollision = pair.bodyA.id == state.ground.id or pair.bodyB.id == state.ground.id
-          if floorCollision:
+          #let floorCollision = pair.bodyA.id == state.ground.id or pair.bodyB.id == state.ground.id
+          let collision = pair.bodyA.collisionFilter.category.to(int) == 2 or
+            pair.bodyB.collisionFilter.category.to(int) == 2
+          
+          if collision:
             b.frictionAir = 0.1
             b.collisionFilter.mask = 3
             toDelete.add i
 
-            if state.trajectory.followBullet:
+            if state.followBullet:
               state.trajectory.pinnedPoint = state.trajectory.points.high
               state.trajectory.closestPoint = state.trajectory.pinnedPoint
               state.updatePointAccordion()
@@ -782,166 +954,165 @@ proc onCollisionStart(state: var ParabolaState, event: JsObject) =
 proc onBeforeRender(state: var ParabolaState, event: JsObject) = 
   return
   # WIP zoom
-  let mouse = state.mouse
-  var scaleFactor = mouse.wheelDelta.to(float) * -0.1
+  #let mouse = state.mouse
+  #var scaleFactor = mouse.wheelDelta.to(float) * -0.1
 
-  if state.boundsScaleTarget + scaleFactor >= 1 and 
-    (scaleFactor < 0 and state.boundsScale.x.to(float) >= 0.6 or 
-      scaleFactor > 0 and state.boundsScale.x.to(float) <= 1.4):
-    state.boundsScaleTarget += scaleFactor
+  #if state.boundsScaleTarget + scaleFactor >= 1 and 
+  #  (scaleFactor < 0 and state.boundsScale.x.to(float) >= 0.6 or 
+  #    scaleFactor > 0 and state.boundsScale.x.to(float) <= 1.4):
+  #  state.boundsScaleTarget += scaleFactor
 
-  # if scale has changed
-  if abs(state.boundsScale.x.to(float) - state.boundsScaleTarget) > 0.01:
-    # smoothly tween scale factor
-    scaleFactor = (state.boundsScaleTarget - state.boundsScale.x.to(float)) * 0.2
-    state.boundsScale.x += toJs scaleFactor
-    state.boundsScale.y += toJs scaleFactor
+  ## if scale has changed
+  #if abs(state.boundsScale.x.to(float) - state.boundsScaleTarget) > 0.01:
+  #  # smoothly tween scale factor
+  #  scaleFactor = (state.boundsScaleTarget - state.boundsScale.x.to(float)) * 0.2
+  #  state.boundsScale.x += toJs scaleFactor
+  #  state.boundsScale.y += toJs scaleFactor
 
-    # scale the render bounds
-    state.render.bounds.max.x = state.render.bounds.min.x + state.render.options.width.toJs * state.boundsScale.x
-    state.render.bounds.max.y = state.render.bounds.min.y + state.render.options.height.toJs * state.boundsScale.y
+  #  # scale the render bounds
+  #  state.render.bounds.max.x = state.render.bounds.min.x + state.render.options.width.toJs * state.boundsScale.x
+  #  state.render.bounds.max.y = state.render.bounds.min.y + state.render.options.height.toJs * state.boundsScale.y
 
-    # translate so zoom is from centre of view
-    let translate = JsObject{
-      x: state.render.options.width.to(float) * scaleFactor * -0.5,
-      y: state.render.options.height.to(float) * scaleFactor * -0.5
-    }
+  #  # translate so zoom is from centre of view
+  #  let translate = JsObject{
+  #    x: state.render.options.width.to(float) * scaleFactor * -0.5,
+  #    y: state.render.options.height.to(float) * scaleFactor * -0.5
+  #  }
 
-    Bounds.translate(state.render.bounds, translate)
+  #  Bounds.translate(state.render.bounds, translate)
 
-    # update mouse
-    Mouse.setScale(mouse, state.boundsScale)
-    Mouse.setOffset(mouse, state.render.bounds.min)
+  #  # update mouse
+  #  Mouse.setScale(mouse, state.boundsScale)
+  #  Mouse.setOffset(mouse, state.render.bounds.min)
 
-  # get vector from mouse relative to centre of viewport
-  var viewportCentre = JsObject{
-    x: state.render.options.width * toJs 0.5,
-    y: state.render.options.height * toJs 0.5
-  }
-  let deltaCentre = Vector.sub(mouse.absolute, viewportCentre)
-  let centreDist = Vector.magnitude(deltaCentre)
+  ## get vector from mouse relative to centre of viewport
+  #var viewportCentre = JsObject{
+  #  x: state.render.options.width * toJs 0.5,
+  #  y: state.render.options.height * toJs 0.5
+  #}
+  #let deltaCentre = Vector.sub(mouse.absolute, viewportCentre)
+  #let centreDist = Vector.magnitude(deltaCentre)
 
-  # translate the view if mouse has moved over 50px from the centre of viewport
-  if centreDist.to(float) > 50:
-    # create a vector to translate the view, allowing the user to control view speed
-    let direction = Vector.normalise(deltaCentre)
-    let speed = min(10, pow(centreDist.to(float) - 50, 2) * 0.0002)
+  ## translate the view if mouse has moved over 50px from the centre of viewport
+  #if centreDist.to(float) > 50:
+  #  # create a vector to translate the view, allowing the user to control view speed
+  #  let direction = Vector.normalise(deltaCentre)
+  #  let speed = min(10, pow(centreDist.to(float) - 50, 2) * 0.0002)
 
-    let translate = Vector.mult(direction, speed)
+  #  let translate = Vector.mult(direction, speed)
 
-    # prevent the view moving outside the extens (bounds)
-    if to(state.render.bounds.min.x + translate.x < state.bounds.min.x, bool):
-      translate.x = state.bounds.min.x - state.render.bounds.min.x
+  #  # prevent the view moving outside the extens (bounds)
+  #  if to(state.render.bounds.min.x + translate.x < state.bounds.min.x, bool):
+  #    translate.x = state.bounds.min.x - state.render.bounds.min.x
 
-    if to(state.render.bounds.max.x + translate.x > state.bounds.max.x, bool):
-      translate.x = state.bounds.max.x - state.render.bounds.max.x
+  #  if to(state.render.bounds.max.x + translate.x > state.bounds.max.x, bool):
+  #    translate.x = state.bounds.max.x - state.render.bounds.max.x
 
-    if to(state.render.bounds.min.y + translate.y < state.bounds.min.y, bool):
-      translate.y = state.bounds.min.y - state.render.bounds.min.y
+  #  if to(state.render.bounds.min.y + translate.y < state.bounds.min.y, bool):
+  #    translate.y = state.bounds.min.y - state.render.bounds.min.y
 
-    if to(state.render.bounds.max.y + translate.y > state.bounds.max.y, bool):
-      translate.y = state.bounds.max.y - state.render.bounds.max.y
+  #  if to(state.render.bounds.max.y + translate.y > state.bounds.max.y, bool):
+  #    translate.y = state.bounds.max.y - state.render.bounds.max.y
 
-    # move the view
-    Bounds.translate(state.render.bounds, translate)
+  #  # move the view
+  #  Bounds.translate(state.render.bounds, translate)
 
-    # we must update the mouse too
-    Mouse.setOffset(mouse, state.render.bounds.min)
+  #  # we must update the mouse too
+  #  Mouse.setOffset(mouse, state.render.bounds.min)
 
 proc drawVelocityArrows(state: ParabolaState, ctx: JsObject) = 
   for bi in state.canon.flyingBullets:
     let b = state.canon.bullets[bi]
-    let pos = b.position
     const
       threshold = 4.0
       arrowWidth = 3
     if b.velocity.y.to(float) notin -threshold..threshold:
-      drawArrow(ctx, pos.x, pos.y, 
-        pos.x,
-        pos.y + (b.velocity.y * toJs velVectorScale), 
+      drawArrow(ctx, b.position.x, b.position.y, 
+        b.position.x,
+        b.position.y + (b.velocity.y * toJs velVectorScale), 
         toJs arrowWidth, toJs cstring"red"
       )
 
     if b.velocity.x.to(float) notin -threshold..threshold:
-      drawArrow(ctx, pos.x, pos.y, 
-        pos.x + (b.velocity.x * toJs velVectorScale), 
-        pos.y,
+      drawArrow(ctx, b.position.x, b.position.y, 
+        b.position.x + (b.velocity.x * toJs velVectorScale), 
+        b.position.y,
         toJs arrowWidth, toJs cstring"#3FD0F6" # Neon blue
       )
 
     if b.velocity.x.to(float) notin -threshold..threshold or 
       b.velocity.y.to(float) notin -threshold..threshold:
-      drawArrow(ctx, pos.x, pos.y, 
-        pos.x + (b.velocity.x * toJs velVectorScale), 
-        pos.y + (b.velocity.y * toJs velVectorScale), 
+      drawArrow(ctx, b.position.x, b.position.y, 
+        b.position.x + (b.velocity.x * toJs velVectorScale), 
+        b.position.y + (b.velocity.y * toJs velVectorScale), 
         toJs arrowWidth, toJs cstring"white"
       )
 
 proc drawTrajectory(state: ParabolaState, ctx: JsObject) = 
-  let trjctry = state.trajectory
+  for e, trjctry in state.trajectories:
+    if trjctry.points.len == 0: continue
 
-  ctx.beginPath()
-  let pos0 = state.getPos(trjctry.points[0])
-  ctx.moveTo(pos0.x, pos0.y)
+    ctx.beginPath()
+    let pos0 = state.getPos(trjctry.points[0])
+    ctx.moveTo(pos0.x, pos0.y)
 
-  #ctx.globalAlpha = 0.7
-  ctx.strokeStyle = cstring trajectoryStrokeStyle
-  ctx.lineWidth = trajectoryLineWidth
+    ctx.strokeStyle = cstring trajectoryStrokeStyles[trjctry.color]
+    ctx.lineWidth = trajectoryLineWidth
 
-  for e, p in trjctry.points[1..^1]:
-    let pos = state.getPos(p)
-    ctx.lineTo(pos.x, pos.y)
+    for e, p in trjctry.points[1..^1]:
+      let pos = state.getPos(p)
+      ctx.lineTo(pos.x, pos.y)
 
-  ctx.stroke()
+    ctx.stroke()
+
+  if state.currentTrajectory notin state.trajectories:
+    return
 
   # Draw points
-  #ctx.globalAlpha = 1
   ctx.fillStyle = cstring"#47D916"
 
-  if trjctry.highestPoint in trjctry.points:
-    let middlePos = state.getPos(trjctry.points[trjctry.highestPoint])
+  if state.trajectory.highestPoint in state.trajectory.points:
+    let middlePos = state.getPos(state.trajectory.points[state.trajectory.highestPoint])
     ctx.beginPath()
     ctx.arc(middlePos.x, middlePos.y, 
       int(trajectoryPointRadius.float * 0.8), 0, 2 * PI
     )
     ctx.fill()
 
-  let lastPos = state.getPos(trjctry.points[^1])
-  ctx.beginPath()
-  ctx.arc(lastPos.x, lastPos.y, 
-    int(trajectoryPointRadius.float * 0.8), 0, 2 * PI
-  )
-  ctx.fill()
+  if state.trajectory.points.len > 0:
+    let lastPos = state.getPos(state.trajectory.points[^1])
+    ctx.beginPath()
+    ctx.arc(lastPos.x, lastPos.y, 
+      int(trajectoryPointRadius.float * 0.8), 0, 2 * PI
+    )
+    ctx.fill()
 
   let (drawPoint, pos) = 
-    if (trjctry.followBullet and state.canon.flyingBullets.len > 0):
+    if (state.followBullet and state.canon.flyingBullets.len > 0):
       (false, Vec.default)
-    elif trjctry.dragging and trjctry.closestPoint in trjctry.points:
-      (true, state.getPos(trjctry.points[trjctry.closestPoint]))
-    elif not trjctry.dragging and trjctry.pinnedPoint in trjctry.points:
-      (true, state.getPos(trjctry.points[trjctry.pinnedPoint]))
+    elif state.draggingPoint and state.trajectory.closestPoint in state.trajectory.points:
+      (true, state.getPos(state.trajectory.points[state.trajectory.closestPoint]))
+    elif not state.draggingPoint and state.trajectory.pinnedPoint in state.trajectory.points:
+      (true, state.getPos(state.trajectory.points[state.trajectory.pinnedPoint]))
     else: (false, Vec.default)
 
   if drawPoint:
-    ctx.globalAlpha = 0.8
     ctx.fillStyle = cstring"#16B0D9"
     ctx.beginPath()
     ctx.arc(pos.x, pos.y, 
       trajectoryPointRadius, 0, 2 * PI
     )
     ctx.fill()
-    ctx.globalAlpha = 1
 
 proc drawHeight(state: ParabolaState, ctx: JsObject) = 
   # So that when clientHeight is 621, size is 25
   #let fontSize = int round(state.canvas.clientHeight.float * 
   #  0.040257648953301126, 0)
   const width = 20
-  let height = state.canon.state.height
-  let text = &"{state.strfloat(height.toMuDistance)}m"
+  let text = &"{state.strfloat(state.trajectory.state.height.toMuDistance)}m"
   let xOffset = -(state.canon.platform.imgSize.x / 2) - 10
 
-  if height > 0:
+  if state.trajectory.state.height > 0:
     ctx.beginPath()
     ctx.moveTo(state.canon.pivot.x + xOffset - width, 
       state.canvas.clientHeight.float - groundHeight)
@@ -949,14 +1120,14 @@ proc drawHeight(state: ParabolaState, ctx: JsObject) =
       state.canvas.clientHeight.float - groundHeight)
 
     ctx.moveTo(state.canon.pivot.x + xOffset - width, 
-      state.canvas.clientHeight.float - groundHeight - height)
+      state.canvas.clientHeight.float - groundHeight - state.trajectory.state.height)
     ctx.lineTo(state.canon.pivot.x + xOffset, 
-      state.canvas.clientHeight.float - groundHeight - height)
+      state.canvas.clientHeight.float - groundHeight - state.trajectory.state.height)
 
     ctx.moveTo(state.canon.pivot.x + xOffset - (width / 2), 
       state.canvas.clientHeight.float - groundHeight)
     ctx.lineTo(state.canon.pivot.x + xOffset - (width / 2), 
-      state.canvas.clientHeight.float - groundHeight - height)
+      state.canvas.clientHeight.float - groundHeight - state.trajectory.state.height)
 
     ctx.strokeStyle = cstring"white"
     ctx.lineWidth = 1
@@ -975,7 +1146,7 @@ proc drawHeight(state: ParabolaState, ctx: JsObject) =
 
   ctx.fillText(cstring text, 
     state.canon.pivot.x + xOffset - (width / 2) - twidth - 5,
-    state.canvas.clientHeight.float - groundHeight - (height / 2) - (theight / 2))
+    state.canvas.clientHeight.float - groundHeight - (state.trajectory.state.height / 2) - (theight / 2))
 
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
@@ -984,10 +1155,10 @@ proc drawRange(state: ParabolaState, ctx: JsObject) =
   const
     height = 10
     yOffset = groundHeight - 35
-  let maxRange = state.trajectory.maxRange
-  let text = &"{state.strfloat(maxRange.toMuDistance)}m"
+
+  let text = &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m"
   
-  if maxRange != 0:
+  if state.trajectory.maxRange != 0:
     ctx.beginPath()
     ctx.moveTo(state.canon.pivot.x, 
       state.canvas.clientHeight.float - groundHeight + yOffset)
@@ -1032,10 +1203,10 @@ proc drawAngle(state: ParabolaState, ctx: JsObject) =
   ctx.moveTo(state.canon.pivot.x, state.canon.pivot.y)
   ctx.lineTo(state.canon.pivot.x + radius, state.canon.pivot.y)
   ctx.arc(state.canon.pivot.x, state.canon.pivot.y, radius, 
-    0, -state.canon.state.angleRad, true)
+    0, -state.trajectory.state.angleRad, true)
   ctx.stroke()
 
-  let angle = abs(state.canon.state.angleDeg)
+  let angle = abs(state.trajectory.state.angleDeg)
   let text = &"{angle:.0f}°"
     #if angle.int.float == angle: # If it doesn't have decimals
     #  &"{angle:.0f}°"
@@ -1055,24 +1226,23 @@ proc drawAngle(state: ParabolaState, ctx: JsObject) =
   ctx.shadowOffsetY = 0
 
 proc onAfterRender(state: var ParabolaState, event: JsObject) = 
-  Render.startViewTransform(state.render)
-  let ctx = state.render.context
+  try:
+    Render.startViewTransform(state.render)
+    let ctx = state.render.context
 
-  state.drawVelocityArrows(ctx)
+    state.drawVelocityArrows(ctx)
 
-  # Draw trajectory
-  let trajectory = state.trajectory
+    # Draw trajectory
+    if state.trajectory.points.len > 0:
+      state.drawTrajectory(ctx)
+      state.drawAngle(ctx)
+      state.drawHeight(ctx)
+      state.drawRange(ctx)
 
-  if trajectory.points.len > 0:
-    state.drawTrajectory(ctx)
-
-  if state.canon.showAngle:
-    state.drawAngle(ctx)
-
-  state.drawHeight(ctx)
-  state.drawRange(ctx)
-
-  Render.endViewTransform(state.render)
+    discard Render.endViewTransform(state.render)
+  except:
+    state.pause()
+    raise
 
 proc onAfterAdd(state: var ParabolaState, event: JsObject) = 
   ## Sort bodies by z-index/depth
@@ -1083,7 +1253,6 @@ proc onAfterAdd(state: var ParabolaState, event: JsObject) =
   )
 
 proc onStartdrag(state: var ParabolaState, event: JsObject) = 
-  #echo state.canon.flyingBullets
   var toDelete: seq[int]
   for i, bi in state.canon.flyingBullets:
     let b = state.canon.bullets[bi]
@@ -1092,12 +1261,11 @@ proc onStartdrag(state: var ParabolaState, event: JsObject) =
       b.collisionFilter.mask = 3
       toDelete.add i
 
-      if state.trajectory.followBullet:
+      if state.followBullet:
         state.trajectory.pinnedPoint = state.trajectory.closestPoint
 
   for i in countdown(toDelete.high, toDelete.low):
     state.canon.flyingBullets.delete(toDelete[i])
-  #echo state.canon.flyingBullets
 
 proc unloadEvents(state: var ParabolaState) = 
   state.mouse.element.removeEventListener("mousedown", state.onMousedown)
@@ -1108,7 +1276,7 @@ proc unloadEvents(state: var ParabolaState) =
 
 proc loadEvents(state: var ParabolaState) = 
   proc onMousemove(event: JsObject) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     if state.canon.dragging:
       let targetAngle = Vector.angle(state.canon.pivot.jsVec, 
@@ -1120,25 +1288,25 @@ proc loadEvents(state: var ParabolaState) =
       state.onResize()
       state.rotateCanon(0) # To check if the canon is in the rotation limit
 
-    elif state.trajectory.dragging:
+    elif state.draggingPoint:
       state.calcClosestTrajectoryPoint(state.mouse.position.vec())
       state.updatePointAccordion()
 
   proc onMousedown(event: JsObject) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     case event.button.to(int)
     of 0:
       let t = getTime()
 
       if t - state.timeAtClick <= initDuration(milliseconds = 250):
-        if state.trajectory.followBullet and state.canon.flyingBullets.len > 0:
-          getElementById("point-input-f").checked = false
-          state.trajectory.followBullet = false
-
         state.calcClosestTrajectoryPoint(state.mouse.position.vec(), minRange = true)
         if state.trajectory.closestPoint in state.trajectory.points:
-          state.trajectory.dragging = true
+          if state.followBullet and state.canon.flyingBullets.len > 0:
+            getElementById("point-input-f").checked = false
+            state.followBullet = false
+
+          state.draggingPoint = true
           state.updatePointAccordion()
         # If you double clicked outside of the minRange, remove the pinnedPoint
         elif state.trajectory.pinnedPoint in state.trajectory.points:
@@ -1154,8 +1322,10 @@ proc loadEvents(state: var ParabolaState) =
       elif Bounds.contains(state.canon.platform.body.bounds, state.mouse.position).to(bool):
         state.canon.base.dragging = true
         state.canon.base.dragOffset = state.canon.base.body.getY - state.mouse.position.y.to(float)
-      else:
+      elif state.frozen or not state.paused:
         MouseConstraint.onmousedown(state.mouseCons, Composite.allBodies(state.engine.world))
+        if state.frozen:
+          state.unfreeze()
 
       state.timeAtClick = t
     of 1:
@@ -1163,24 +1333,24 @@ proc loadEvents(state: var ParabolaState) =
     else: discard
 
   proc onMouseup(event: JsObject) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     case event.button.to(int)
     of 0:
-      MouseConstraint.onmouseup(state.mouseCons, Composite.allBodies(state.engine.world))
+      MouseConstraint.onmouseup(state.mouseCons)
    
-      if state.trajectory.dragging and state.trajectory.closestPoint in state.trajectory.points:
+      if state.draggingPoint and state.trajectory.closestPoint in state.trajectory.points:
         state.trajectory.pinnedPoint = state.trajectory.closestPoint
         state.updatePointAccordion()
 
       state.canon.dragging = false
       state.canon.base.dragging = false
-      state.trajectory.dragging = false
+      state.draggingPoint = false
     else:
       discard
 
   proc onMouseleave(event: JsObject) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     # If the mouse leaves the canvas while dragging the base through the
     # bottom, drop the canon base to the floor. Since it's usual that if you
@@ -1191,24 +1361,25 @@ proc loadEvents(state: var ParabolaState) =
     #    state.canon.elevated = false
     #    state.onResize()
 
-    if state.trajectory.dragging and state.trajectory.closestPoint in state.trajectory.points:
+    if state.draggingPoint and state.trajectory.closestPoint in state.trajectory.points:
       state.trajectory.pinnedPoint = state.trajectory.closestPoint
       state.updatePointAccordion()
 
     state.canon.dragging = false
     state.canon.base.dragging = false
-    state.trajectory.dragging = false
+    state.draggingPoint = false
 
     # To stop the mouse constraint
-    state.mouseCons.mouse.button = -1
+    MouseConstraint.onmouseup(state.mouseCons)
+    #state.mouseCons.mouse.button = -1
 
   proc onWheel(event: JsObject) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     let wheelDelta = event.wheelDelta.to(float)
     if wheelDelta != 0:
       let change = wheelDelta * (canonInitialSpeed / 4800)
-      state.canon.state.setSpeed(state.canon.state.speed + change)
+      state.trajectory.state.setSpeed(state.trajectory.state.speed + change)
       state.calcTrajectory()
 
   with state:
@@ -1257,9 +1428,7 @@ proc loadEvents(state: var ParabolaState) =
   Events.on(state.mouseCons, "startdrag", 
     (event: JsObject) => state.onStartdrag(event))
 
-proc onImagesLoaded*(state: var ParabolaState) = 
-  Render.run(state.render)
-
+proc onImagesLoaded(state: var ParabolaState) = 
   state.canon.imgSize = state.render.textures[canonTexture].sizeVec()
   state.canon.base.imgSize = state.render.textures[canonTexture].sizeVec()
   state.canon.platform.imgSize = state.render.textures[canonPlatformTexture].sizeVec()
@@ -1270,11 +1439,13 @@ proc onImagesLoaded*(state: var ParabolaState) =
   Body.scale(state.canon.platform.body, state.canon.platform.imgSize.x, 
     state.canon.platform.imgSize.y)
 
-  state.onResize(trajectory = false, first = true)
+  state.onResize(first = true)
   state.rotateCanonBack(degToRad(60d))
   state.calcTrajectory()
 
-  state.rendering = true
+  Render.run(state.render)
+
+  state.startedRendering = true
 
 #proc typesetMathjax(): Future[void] = 
 #  var promise = newPromise() do (resolve: proc()):
@@ -1287,11 +1458,15 @@ proc load*(state: var ParabolaState) =
   Matter.use("matter-wrap")
   loadMatterAliases()
 
-  let gravity = state.canon.state.gravity.jsVec()
+  let gravity = state.trajectory.state.gravity.jsVec()
   gravity.scale = 1
 
   state.canvas = getElementById("canvas")
-  state.engine = createEngine(JsObject{gravity: gravity, timing: JsObject{timeScale: timeScale}})
+  state.canvas.focus()
+  state.engine = createEngine(JsObject{gravity: gravity, 
+    timing: JsObject{timeScale: timeScale}, 
+    enableSleeping: true,
+  })
   state.render = createRender(JsObject{
     canvas: state.canvas,
     engine: state.engine,
@@ -1351,7 +1526,7 @@ proc load*(state: var ParabolaState) =
     state.canvas.clientHeight.float * 0.6, 20, 80, 
     JsObject{zIndex: 0, isStatic: false, label: cstring"Thingy", frictionAir: 0.1, 
       friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
-      collisionFilter: JsObject{mask: 3}
+      collisionFilter: JsObject{category: 2, mask: 3}, sleepThreshold: 1,
   })
   #Body.setInertia(state.thingy, 0.1)
 
@@ -1381,26 +1556,24 @@ proc load*(state: var ParabolaState) =
     # Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
   ])
 
-  # Typeset before loading textures because when the textures are loaded calcTrajectory is called
-  # which updates the formulaAccordion which needs mathjax expressions to be rendered
-  MathJax.typesetPromise().then(proc() = 
-    # Wait until all textures are loaded
-    var loadedImgCount = 0
-    var images = newSeq[cstring]()
-    for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
-      if not b.render.sprite.texture.isUndefined and not to(b.render.sprite.texture in state.render.textures, bool):
-        images.add b.render.sprite.texture.to(cstring)
+  # Wait until all textures are loaded
+  var loadedImgCount = 0
+  var images = newSeq[cstring]()
+  for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
+    if not b.render.sprite.texture.isUndefined and not to(b.render.sprite.texture in state.render.textures, bool):
+      images.add b.render.sprite.texture.to(cstring)
 
-    for src in images:
-      let img = newImage()
-      img.onload = proc() =
-        inc loadedImgCount
-        if loadedImgCount == images.len:
+  for src in images:
+    let img = newImage()
+    img.onload = proc() =
+      inc loadedImgCount
+      if loadedImgCount == images.len:
+        # Typeset mathjax expressions before since onImagesLoaded updates them
+        MathJax.typesetPromise().then proc() = 
           state.onImagesLoaded()
 
-      img.src = src
-      state.render.textures[src] = img
-  )
+    img.src = src
+    state.render.textures[src] = img
 
 ## Reloads the simulation
 proc reload*(state: var ParabolaState) =
@@ -1412,64 +1585,21 @@ proc reload*(state: var ParabolaState) =
   state = initParabolaState()
   getElementById("point-input-f").checked = false
   state.load()
+  if not kxi.surpressRedraws: redraw(kxi)
 
-proc togglePause(state: var ParabolaState) = 
-  if state.paused:
-    state.engine.timing.timeScale = timeScale
-  else:
-    state.engine.timing.timeScale = 0
-
-  state.paused = not state.paused
-
-proc renderLeftDiv*(state: var ParabolaState): VNode =
+proc renderLeftDiv(state: var ParabolaState): VNode =
   buildHtml tdiv(id = "sim", class = "column col-8", style = "height: 100%".toCss):
-    #button():
-    #  #text "Pause/Resume"
-    #  if state.engine.isNil:
-    #      span(class = "material-symbols-outlined", text "play_pause")
-    #  else:
-    #    if state.paused:
-    #      span(class = "material-symbols-outlined", text "play_arrow")
-    #    else:
-    #      span(class = "material-symbols-outlined", text "pause")
-
-    #  proc onclick()  =
-    #    state.togglePause()
-
-    #button():
-    #  span(class = "material-symbols-outlined", text "rotate_left")
-    #  proc onclick() =
-    #    state.rotateCanonBack()
-    #    state.calcTrajectory()
-
-    #button():
-    #  span(class = "material-symbols-outlined", text "rotate_right")
-    #  proc onclick() =
-    #    state.rotateCanon()
-    #    state.calcTrajectory()
-
-    #button():
-    #  verbatim parabolaIconSvg
-    #  #img(src = "/public/img/parabola.svg", alt = "Parabola Trajectory")
-    #  proc onclick() = calcTrajectory()
-    #  #text "Trajectory"
-
-    #button():
-    #  span(class = "material-symbols-outlined", text "north_east")
-    #  proc onclick() =
-    #    state.fireBullet()
-
-    #br()
-
     # tabindex makes it able to focus the canvas
     canvas(id = "canvas", style = toCss "height: 100%; width: 100%; min-width: 500px;" & 
-      "min-height: 300px; background: rgb(20, 21, 31)", tabindex = "0"):
-      #style = fmt"width: 100vw; min-width: 500px height: 65vh; min-height: 300px; background: rgb(20, 21, 31)".toCss):
+      "min-height: 300px; background: rgb(20, 21, 31); outline: none", tabindex = "0"):
       text "Matter-js simulation"
       proc onclick(e: Event, n: VNode) = 
         n.dom.focus()
+      # Doing this because I saw it on matter-js's Render._createCanvas
+      proc oncontextmenu(ev: Event, _: VNode) = ev.preventDefault()
+      proc ondragstart(ev: Event, _: VNode) = ev.preventDefault()
 
-proc renderFormulasAccordion*(state: var ParabolaState): VNode =
+proc renderFormulasAccordion(state: var ParabolaState): VNode =
   let liStyle = "margin-top: 20px;".toCss
   let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
@@ -1501,7 +1631,8 @@ proc renderFormulasAccordion*(state: var ParabolaState): VNode =
     tdiv(id = "maxheight", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-1", hidden = true, checked = false)
-      label(class = "accordion-header tooltip", `for` = "accordion-f-1", `data-tooltip` = "Max height"):
+      label(class = "accordion-header tooltip", `for` = "accordion-f-1", 
+        `data-tooltip` = "Max height", `disabled-data-tooltip` = "The canon cannot point downwards"):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g} = d\)"
 
@@ -1548,11 +1679,11 @@ proc renderFormulasAccordion*(state: var ParabolaState): VNode =
           li(): 
             text r"\(x_{max} = v\:\cdot\:t = d\)"
 
-proc renderStateAccordion*(state: var ParabolaState): VNode =
-  let siInitialState = state.canon.state.toMu()
+proc renderStateAccordion(state: var ParabolaState): VNode =
+  let siInitialState = state.trajectory.state.toMu()
  
   proc onInputHChange(e: Event, n: VNode) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     var h = 0.0
 
@@ -1565,36 +1696,36 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
     state.calcTrajectory()
   
   proc onInputAChange(e: Event, n: VNode) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     var a = 0
 
     discard parseInt($n.value, a)
     a = a.clamp(0..360)
     state.rotateCanon(degToRad(
-      normalizeAngle(state.canon.body.angle.to(float)) - a.float
+      state.canon.normalizedAngleDeg() - a.float
     ))
     state.calcTrajectory()
 
   proc onInputSChange(e: Event, n: VNode) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     var s = 0.0
 
     discard parseFloat($n.value, s)
     s = s.fromMuSpeed().round(state.floatPrecision)
-    state.canon.state.setSpeed(s)
+    state.trajectory.state.setSpeed(s)
     state.calcTrajectory()
   
   proc onInputGChange(e: Event, n: VNode) = 
-    if not state.rendering: return
+    if not state.startedRendering: return
 
     var g = 0.0
 
     discard parseFloat($n.value, g)
     g = g.clamp(3, 30).fromMuAcceleration().round(state.floatPrecision)
-    state.canon.state.gravity.y = g / gravityFactor
-    state.engine.gravity.y = state.canon.state.gravity.y
+    state.trajectory.state.gravity.y = g / gravityFactor
+    state.engine.gravity.y = state.trajectory.state.gravity.y
     state.calcTrajectory()
   
   buildHtml form(class = "form-horizontal"):
@@ -1651,22 +1782,14 @@ proc renderStateAccordion*(state: var ParabolaState): VNode =
 
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
-proc renderPointAccordion*(state: var ParabolaState): VNode =
-  var show = false
-  var point: TrajectoryPoint
-
-  if state.trajectory.dragging and state.trajectory.closestPoint in state.trajectory.points:
-    show = true
-    point = state.trajectory.points[state.trajectory.closestPoint].toMu()
-  elif not state.trajectory.dragging and state.trajectory.pinnedPoint in state.trajectory.points:
-    show = true
-    point = state.trajectory.points[state.trajectory.pinnedPoint].toMu()
+proc renderPointAccordion(state: var ParabolaState): VNode =
+  let (show, point) = state.currentPoint()
 
   let liStyle = "margin-top: 20px;".toCss
   let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
   proc onInputXChange(ev: Event, n: VNode) = 
-    if not state.rendering or state.trajectory.points.len == 0: return
+    if not state.startedRendering or state.trajectory.points.len == 0: return
 
     var x = 0.0
 
@@ -1694,7 +1817,7 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
       (index, exactMatch) = state.trajectory.points.findBy(x, (p) => p.pos.x)
       if not exactMatch:
         var newP: TrajectoryPoint
-        var initialState = state.canon.state
+        var initialState = state.trajectory.state
         initialState.gravity = initialState.gravity * gravityFactor
 
         with newP:
@@ -1711,7 +1834,7 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
     state.updatePointAccordion()
 
   proc onInputTChange(ev: Event, n: VNode) = 
-    if not state.rendering or state.trajectory.points.len == 0: return
+    if not state.startedRendering or state.trajectory.points.len == 0: return
     #elif state.followBullet and
 
     var t = 0.0
@@ -1732,7 +1855,7 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
       (index, exactMatch) = state.trajectory.points.findBy(t, (p) => p.time)
       if not exactMatch:
         var newP: TrajectoryPoint
-        var initialState = state.canon.state
+        var initialState = state.trajectory.state
         initialState.gravity = initialState.gravity * gravityFactor
 
         with newP:
@@ -1749,7 +1872,7 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
     state.updatePointAccordion()
 
   proc onInputYChange(ev: Event, n: VNode) = 
-    if not state.rendering or state.trajectory.points.len == 0: return
+    if not state.startedRendering or state.trajectory.points.len == 0: return
 
     var y = 0.0
     var val = $n.value
@@ -1786,7 +1909,7 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
       echo (i: index, e: exactMatch)
       if not exactMatch:
         var newP: TrajectoryPoint
-        var initialState = state.canon.state
+        var initialState = state.trajectory.state
         initialState.gravity = initialState.gravity * gravityFactor
 
         echo (t1: initialState.calcTime(y, true), t2: initialState.calcTime(y, false))
@@ -1852,8 +1975,8 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
         input(class = "form-checkbox form-inline", `type` = "checkbox", id = "point-input-f", 
           checked = false):
           proc onchange(ev: Event, n: VNode) = 
-            state.trajectory.followBullet = n.dom.checked
-            if state.trajectory.followBullet:
+            state.followBullet = n.dom.checked
+            if state.followBullet:
               if state.canon.flyingBullets.len > 0:
                 state.calcClosestTrajectoryPointToBullet()
                 state.updatePointAccordion()
@@ -1865,10 +1988,45 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
 
+    tdiv(id = "x", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-x", hidden = true, checked = false)
+      label(class = "accordion-header tooltip", `for` = "accordion-f-x", 
+        `data-tooltip` = "Pos X", `disabled-data-tooltip` = "There is no trajectory point selected"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(x = t\:\cdot\:v_{ox} = d\)"
+
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(x = t\:\cdot\:v = d\)"
+          #li(style = liStyle): 
+            #text r"\(x = x\:+\:t\:\cdot\:v = d\)"
+
+    tdiv(id = "y", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-y", hidden = true, checked = false)
+      label(class = "accordion-header tooltip", `for` = "accordion-f-y", 
+        `data-tooltip` = "Pos X", `disabled-data-tooltip` = "There is no trajectory point selected"):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(y = h\:+\:t\:\cdot\:v_{oy}\:+\:\dfrac{g\:\cdot\:t^2}{2} = d\)"
+
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(y = h\:+\:t\:\cdot\:v\:+\:\dfrac{g\:\cdot\:t^2}{2}\)"
+          li(style = liStyle): 
+            text r"\(y = h\:+\:a\:+\:\dfrac{g\:\cdot\:t}{2}\)"
+          li(style = liStyle): 
+            text r"\(y = b\:+\:\dfrac{c}{2}\)"
+          li(style = liStyle): 
+            text r"\(y = b\:+\:d = e\)"
+
     tdiv(id = "vy", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-vy", hidden = true, checked = false)
-      label(class = "accordion-header tooltip", `for` = "accordion-f-vy", `data-tooltip` = "Velocity Y"):
+      label(class = "accordion-header tooltip", `for` = "accordion-f-vy", 
+        `data-tooltip` = "Velocity Y", `disabled-data-tooltip` = "There is no trajectory point selected"):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(v_{y} = v_{iy}\:-\:g\:\cdot\:t = d\)"
 
@@ -1879,9 +2037,104 @@ proc renderPointAccordion*(state: var ParabolaState): VNode =
           li(style = liStyle): 
             text r"\(v_{y} = v\:-\:a = b\)"
 
-proc renderRightDiv*(state: var ParabolaState): VNode =
+proc addTrajectory(state: var ParabolaState) = 
+  if state.trajectories.len < trajectoryStrokeStyles.len:
+    var colIndex = -1
+
+    for e, c in trajectoryStrokeStyles:
+      var available = true
+      for t in state.trajectories:
+        if t.color == e:
+          available = false
+          break
+      if available:
+        colIndex = e
+
+    state.trajectories.add state.trajectory
+    state.currentTrajectory = state.trajectories.high
+    state.trajectory.color = colIndex
+
+    if state.trajectory.state.angleDeg +  canonAngleChangeDeg >= state.rotationLimit.b:
+      state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - 60))
+    else:
+      state.rotateCanonBack(degToRad(canonAngleChangeDeg * 2))
+
+    state.calcTrajectory()
+    if not kxi.surpressRedraws: redraw(kxi)
+
+proc renderTrajectories(state: var ParabolaState): VNode = 
+  proc onRadioChange(e: int): auto = 
+    proc() = 
+      if e in state.trajectories:
+        state.currentTrajectory = e
+
+        state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - state.trajectory.state.angleDeg))
+        state.moveCanonTo(state.canvas.clientHeight.float - groundHeight.float - 
+          state.trajectory.state.height + state.canonYDiff)
+
+        state.calcTrajectory()
+
+  proc onRemoveClick(e: int): auto = 
+    proc() = 
+      if state.trajectories.len > 1 and e in state.trajectories:
+        state.trajectories.delete(e)
+        if state.currentTrajectory > state.trajectories.high:
+          state.currentTrajectory = state.trajectories.high
+
+          state.moveCanonTo(state.canvas.clientHeight.float - 
+            groundHeight.float - state.trajectory.state.height + state.canonYDiff)
+          state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - state.trajectory.state.angleDeg))
+
+        if state.frozen:
+          state.unfreeze()
+
+        if not kxi.surpressRedraws: redraw(kxi)
+
+  buildHtml tdiv(class = "form-horizontal", style = "margin: .4rem .2rem -0.3rem 1.3rem;".toCss):
+    tdiv(class = "form-group"):
+      tdiv(class = "col-3"):
+        label(class = "form-label tooltip tooltip-right", `data-tooltip` = "Double-click a trajectory to delete it"):
+          text "Trajectories"
+
+      tdiv(class = "col-9", id = "traj-radios"): 
+        if state.trajectories.len < trajectoryStrokeStyles.len:
+          button(class = "btn btn-action btn-sm", style = "margin-right: 0.4rem;".toCss):
+            italic(class = "icon icon-plus")
+            proc onclick() = 
+              state.addTrajectory()
+
+        for e, t in state.trajectories:
+          let checked = state.currentTrajectory == e
+          let color = trajectoryStrokeStyles[t.color]
+          label(class = "form-radio form-inline", ondblclick = onRemoveClick(e)):
+            input(`type`  = "radio", name = "trajectory",
+              onchange = onRadioChange(e), checked = checked)
+            italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: {color}")
+
+        #tdiv(class = "popover popover-right"):
+          #  label(class = "form-radio form-inline"):
+          #    input(`type`  = "radio", name = "trajectory",
+          #      onchange = onRadioChange(e), checked = checked)
+          #    italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: {color}")
+
+          #  tdiv(class = "popover-container"):
+          #    if state.trajectories.len > 1:
+          #      button(class = "btn", onclick = onRemoveClick(e)):
+          #        text "Remove"
+
+proc renderRightDiv(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "column col-4", style = toCss "overflow: auto; height: 100%; " & 
       "scrollbar-width: thin;"):
+    state.renderTrajectories()
+    #tdiv(class = "accordion"):
+    #  input(`type` = "checkbox", name  = "accordion-checkbox", 
+    #    id = "accordion-traj", hidden = true, checked = false)
+    #  label(class = "accordion-header", `for` = "accordion-traj"):
+    #    italic(class = "icon icon-arrow-right mr-1")
+    #    text "Trajectories"
+    #  tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
+    #    state.renderTrajectoriesAccordion()
+
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-1", hidden = true, checked = true)
@@ -1916,11 +2169,9 @@ proc renderRightDiv*(state: var ParabolaState): VNode =
       #      text "Trajectory Point"
 
 proc render*(state: var ParabolaState): VNode =
-  buildHtml tdiv(class = "container", style = "height: 100%".toCss):
-    #style = "display: inline-flex;gap: 25px;".toCss):
-    tdiv(class = "columns col-gapless", style = "height: 100%".toCss):
-      state.renderLeftDiv()
-      state.renderRightDiv()
+  buildHtml tdiv(class = "columns col-gapless", style = "height: 100%; width: 100%".toCss):
+    state.renderLeftDiv()
+    state.renderRightDiv()
 
   #buildHtml tdiv(style = "display: flex; flex-direction: column; justify-content: start; align-items: center; height: 100%;".toCss):
   #  state.renderTopDiv()
@@ -1943,17 +2194,13 @@ proc addEventListeners*(state: var ParabolaState) =
   )
 
   document.addEventListener("keyup", proc(event: Event) =
-    if not state.rendering or
+    if not state.startedRendering or
       #(not document.activeElement.isNil and document.activeElement.nodename == "INPUT"): 
       (not document.activeElement.isNil and document.activeElement.id != "canvas"): 
       return
 
-
     let event = KeyboardEvent(event)
-    #echo $event.key
     case $event.key
-    of "t":
-      state.calcTrajectory()
     of "ArrowRight":
       state.rotateCanon()
       state.calcTrajectory()
@@ -1961,10 +2208,10 @@ proc addEventListeners*(state: var ParabolaState) =
       state.rotateCanonBack()
       state.calcTrajectory()
     of "ArrowUp":
-      state.canon.state.setSpeed(state.canon.state.speed + canonSpeedChange)
+      state.trajectory.state.setSpeed(state.trajectory.state.speed + canonSpeedChange)
       state.calcTrajectory()
     of "ArrowDown":
-      state.canon.state.setSpeed(state.canon.state.speed - canonSpeedChange)
+      state.trajectory.state.setSpeed(state.trajectory.state.speed - canonSpeedChange)
       state.calcTrajectory()
     of " ":
       state.fireBullet()
@@ -1972,8 +2219,8 @@ proc addEventListeners*(state: var ParabolaState) =
       state.reload()
     of "p":
       state.togglePause()
+    of "Enter":
+      state.addTrajectory()
     of "d":
-      echo state.canon.pivot
-      echo state.canon.platform.imgSize
-      echo "---"
+      discard "debug"
   )

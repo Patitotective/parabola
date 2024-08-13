@@ -29,7 +29,7 @@ Matter.MouseConstraint.onmousedown = proc(mouseCons, bodies: JsObject) =
             break
           inc i
 
-Matter.MouseConstraint.onmouseup = proc(mouseCons, bodies: JsObject) = 
+Matter.MouseConstraint.onmouseup = proc(mouseCons: JsObject) = 
   let
     mouse = mouseCons.mouse
     cons = mouseCons.constraint
@@ -42,7 +42,7 @@ Matter.MouseConstraint.onmouseup = proc(mouseCons, bodies: JsObject) =
   if to(body, bool):
     Matter.Events.trigger(mouseCons, "enddrag", JsObject{mouse: mouse, body: body})
 
-Matter.MouseConstraint.update = proc(mouseCons, bodies: JsObject) = 
+Matter.MouseConstraint.update = proc(mouseCons: JsObject) = 
   let
     mouse = mouseCons.mouse
     cons = mouseCons.constraint

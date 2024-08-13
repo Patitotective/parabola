@@ -26,6 +26,15 @@ proc loadMatterAliases*() =
 type
   Vec* = tuple[x, y: float]
 
+proc runOnce*(render: JsObject) = 
+  ## Runs the render just once
+  #_updateTiming(render, time);
+
+  Render.world(render, 0)
+
+  render.context.setTransform(render.options.pixelRatio, 0, 0, render.options.pixelRatio, 0, 0)
+  render.context.setTransform(1, 0, 0, 1, 0, 0)
+
 proc createEngine*(options: JsObject = nil): JsObject {.importjs: "Matter.Engine.create(#)".}
 proc createRender*(options: JsObject): JsObject {.importjs: "Matter.Render.create(#)".}
 proc jsVec*(x, y: SomeNumber or JsObject): JsObject = JsObject{x: x, y: y}
