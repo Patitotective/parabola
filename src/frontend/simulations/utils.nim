@@ -110,7 +110,7 @@ proc forceToVelocity*(force: float64, mass: float64, deltaTime = 16.666): float6
   acceleration * deltaTime
 
 proc cloneAllBodies*(world: JsObject): seq[JsObject] =
-  structuredClone(Composite.allBodies(world)).to(seq[JsObject])
+  structuredClone(Matter.Composite.allBodies(world)).to(seq[JsObject])
 
 proc speedToVelDeg*(speed, angleDeg: float): tuple[x, y: float] = 
   let angleRad = degToRad(angleDeg)

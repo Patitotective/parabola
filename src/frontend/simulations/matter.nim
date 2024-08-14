@@ -5,23 +5,6 @@ import std/[jsffi, math]
 var
   Matter* {.importjs, nodecl.}: JsObject
   MatterWrap* {.importjs, nodecl.}: JsObject
-  Body*, Vector*, Engine*, Render*, Runner*, Bodies*, Bounds*, Events*, Composite*, MouseConstraint*, Mouse*, Constraint*: JsObject
-
-# This function is used to load Matter's aliases
-# since when using plugins you should reload aliases
-proc loadMatterAliases*() =
-  Body = Matter.Body
-  Vector = Matter.Vector
-  Engine = Matter.Engine
-  Render = Matter.Render
-  Runner = Matter.Runner
-  Bodies = Matter.Bodies
-  Bounds = Matter.Bounds
-  Events = Matter.Events
-  Composite = Matter.Composite
-  MouseConstraint = Matter.MouseConstraint
-  Mouse = Matter.Mouse
-  Constraint = Matter.Constraint
 
 type
   Vec* = tuple[x, y: float]
@@ -30,7 +13,7 @@ proc runOnce*(render: JsObject) =
   ## Runs the render just once
   #_updateTiming(render, time);
 
-  Render.world(render, 0)
+  Matter.Render.world(render, 0)
 
   render.context.setTransform(render.options.pixelRatio, 0, 0, render.options.pixelRatio, 0, 0)
   render.context.setTransform(1, 0, 0, 1, 0, 0)
@@ -41,13 +24,13 @@ proc jsVec*(x, y: SomeNumber or JsObject): JsObject = JsObject{x: x, y: y}
 proc jsVec*(v: Vec): JsObject = JsObject{x: v.x, y: v.y}
 
 proc setY*(body: JsObject, y: SomeNumber) = 
-  Body.setPosition(body, JsObject{x: body.position.x, y: y})
+  Matter.Body.setPosition(body, JsObject{x: body.position.x, y: y})
 
 proc setX*(body: JsObject, x: SomeNumber) = 
-  Body.setPosition(body, JsObject{y: body.position.y, x: x})
+  Matter.Body.setPosition(body, JsObject{y: body.position.y, x: x})
 
 proc setPos*(body: JsObject, x, y: SomeNumber or JsObject) = 
-  Body.setPosition(body, JsObject{x: x, y: y})
+  Matter.Body.setPosition(body, JsObject{x: x, y: y})
 
 proc getX*(body: JsObject): float = 
   body.position.x.to(float)

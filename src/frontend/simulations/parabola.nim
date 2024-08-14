@@ -46,6 +46,7 @@ type
     bulletOptions*: JsObject
     flyingBullets*: seq[int]
     bulletRadius*: int
+    bulletsLimit*: int
 
     dragging*: bool # Is the canon being dragged
 
@@ -173,6 +174,9 @@ const
   speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*1.69)
   angleLowerLimit = 0.0 # Lower limit when canon is too close to the floor
 
+  gravities = {"Pluto": 0.7, "Moon": 1.6, "Mercury & Mars": 3.7, "Uranus": 8.7,
+    "Venus": 8.9, "Saturn": 9, "Earth": 9.81, "Neptune": 11, "Jupiter": 23.1}
+
 proc setSpeed(state: var CanonState, speed: float) = 
   state.speed = clamp(speed, speedLimit)
   state.vel = speedToVelRad(state.speed, state.angleRad)  
@@ -246,7 +250,7 @@ proc unpause(state: var ParabolaState) =
 
 proc freeze(state: var ParabolaState) = 
   state.pause()
-  Render.stop(state.render)
+  Matter.Render.stop(state.render)
   # I realized that sometimes the canvas would go blank when it froze so I
   # thought the render might stop and leave the canvas blank so we run it once
   # here to be sure there's something on the canvas
@@ -255,7 +259,7 @@ proc freeze(state: var ParabolaState) =
 
 proc unfreeze(state: var ParabolaState) = 
   state.unpause()
-  Render.run(state.render)
+  Matter.Render.run(state.render)
   state.frozen = false
 
 proc togglePause(state: var ParabolaState) = 
@@ -308,7 +312,7 @@ proc rotateCanon(state: var ParabolaState, rad = degToRad(canonAngleChangeDeg), 
         rad = degToRad(state.canon.normalizedAngleDeg() - 
           rotationLimit.b)
 
-  Body.rotate(state.canon.body, rad, state.canon.pivot.jsVec)
+  Matter.Body.rotate(state.canon.body, rad, state.canon.pivot.jsVec)
 
   state.trajectory.state.angleDeg = state.canon.normalizedAngleDeg()
   state.trajectory.state.angleRad = degToRad(float state.trajectory.state.angleDeg)
@@ -319,12 +323,12 @@ proc rotateCanonBack(state: var ParabolaState, rad = degToRad(canonAngleChangeDe
   state.rotateCanon(-rad, limit)
 
 proc nextBullet(state: var ParabolaState): JsObject = 
-  result = Bodies.circle(
+  result = Matter.Bodies.circle(
     state.canon.pivot.x, state.canon.pivot.y, 
     state.canon.bulletRadius, state.canon.bulletOptions
   )
-  Body.setAngle(result, state.trajectory.state.angleDeg)
-  Body.setInertia(result, Infinity)
+  Matter.Body.setAngle(result, state.trajectory.state.angleDeg)
+  Matter.Body.setInertia(result, Infinity)
 
 proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryPoint): T): tuple[index: int, exactMatch: bool] = 
   var closestDistance = 0.0
@@ -475,7 +479,7 @@ proc updateFormulaAccordion(state: var ParabolaState) =
   }
 
   for (query, value) in changes:
-    document.querySelector(query).innerText = cstring value
+    document.querySelector(cstring query).innerText = cstring value
 
   if state.frozen:
     state.unfreeze()
@@ -586,7 +590,7 @@ proc updatePointAccordion(state: var ParabolaState) =
   }
 
   for (query, value) in changes:
-    document.querySelector(query).innerText = cstring value
+    document.querySelector(cstring query).innerText = cstring value
 
   if state.frozen:
     state.unfreeze()
@@ -699,16 +703,16 @@ proc onResize(state: var ParabolaState, first = false) =
   else:
     state.canon.bulletOptions.plugin = JsObject{wrap: wrap}
 
-  for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
+  for b in Matter.Composite.allBodies(state.engine.world).to(seq[JsObject]):
     if b.hasOwnProperty("plugin") and b.plugin.hasOwnProperty("wrap"):
       b.plugin.wrap = wrap
 
     if b.hasOwnProperty("xratio"):
       let pos = JsObject{x: state.canvas.clientWidth.toJs * b.xratio, y: b.position.y}
-      Body.setPosition(b, pos)
+      Matter.Body.setPosition(b, pos)
 
     if b.hasOwnProperty("yratio"):
-      Body.setPosition(b, JsObject{x: b.position.x, y: state.canvas.clientHeight.toJs * b.yratio})
+      Matter.Body.setPosition(b, JsObject{x: b.position.x, y: state.canvas.clientHeight.toJs * b.yratio})
 
   let y = 
     if state.canon.base.dragging:
@@ -733,12 +737,11 @@ proc fireBullet(state: var ParabolaState) =
     if state.canon.bullets[b].getPos() == bullet.getPos():
       return
 
-  const limit = 10
   # If the limit is exceed by the double, remove half of the bullets
-  if state.canon.bullets.len > limit * 2:
+  if state.canon.bullets.len + 1 > state.canon.bulletsLimit * 2:
     var toDelete: seq[int]
-    for i in countup(0, state.canon.bullets.high - limit):
-      Composite.remove(state.engine.world, state.canon.bullets[i])
+    for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit):
+      Matter.Composite.remove(state.engine.world, state.canon.bullets[i])
       toDelete.add i
 
     for i in countdown(toDelete.high, toDelete.low):
@@ -753,19 +756,23 @@ proc fireBullet(state: var ParabolaState) =
           if i > di:
             dec i
 
-  elif state.canon.bullets.len > limit:
-    for i in countup(0, state.canon.bullets.high - limit):
+  elif state.canon.bullets.len + 1 > state.canon.bulletsLimit:
+    for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit):
       state.canon.bullets[i].collisionFilter.mask = 0
+      # If we change the mask but don't wake them, they stay there without being
+      # able to collide with anything, but still since they are sleeping
+      if state.canon.bullets[i].isSleeping.to(bool):
+        Matter.Sleeping.set(state.canon.bullets[i], false)
       # If the bullet of index 0 is in flyingBullets, delete it
       if (let a = state.canon.flyingBullets.find(i); a >= 0):
         state.canon.flyingBullets.delete(a)
 
-  Composite.add(state.engine.world, bullet)
+  Matter.Composite.add(state.engine.world, bullet)
   state.canon.bullets.add bullet
   state.canon.flyingBullets.add state.canon.bullets.high
 
   # Invert vel y since matter's coordinates start from the top instead of the bottom
-  Body.setVelocity(bullet, jsVec(state.trajectory.state.vel.x, -state.trajectory.state.vel.y))
+  Matter.Body.setVelocity(bullet, jsVec(state.trajectory.state.vel.x, -state.trajectory.state.vel.y))
 
   if state.frozen:
     state.unfreeze()
@@ -868,10 +875,10 @@ proc initParabolaState*(): ParabolaState =
     boundsScale: JsObject{x: 1, y: 1},
     boundsScaleTarget: 1, 
     floatPrecision: 2,
-    canon: Canon(bulletRadius: 20, 
+    canon: Canon(bulletRadius: 20, bulletsLimit: 11,
       bulletOptions: JsObject{
         zIndex: 0, isStatic: false, frictionAir: 0, friction: 1, frictionStatic: 1, 
-        collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: "bullet",
+        collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: cstring"bullet",
       }),
     trajectories: @[initTrajectory()],
   )
@@ -883,40 +890,40 @@ proc onAfterUpdate(state: var ParabolaState, event: JsObject) =
         state.calcClosestTrajectoryPointToBullet()
         state.updatePointAccordion()
 
-      # Sequence of bullets to delete from bullets since they went under the floor
-      var toDelete: seq[int]
-      for e, b in state.canon.bullets:
-        # If the bullet is above the floor, make it able to collide with the ground
-        if b.getY > state.canvas.clientHeight.float + b.circleRadius.to(float):
-          Composite.remove(state.engine.world, b)
-          toDelete.add e
+    # Sequence of bullets to delete from bullets since they went under the floor
+    var toDelete: seq[int]
+    for e, b in state.canon.bullets:
+      # If the bullet is above the floor, make it able to collide with the ground
+      if b.getY > state.canvas.clientHeight.float + b.circleRadius.to(float):
+        Matter.Composite.remove(state.engine.world, b)
+        toDelete.add e
 
-        elif e in state.canon.flyingBullets and b.collisionFilter.mask == 0.toJs and
-          b.getY < state.canvas.clientHeight.float - 
-          groundHeight - (b.circleRadius.to(float)):
+      elif e in state.canon.flyingBullets and b.collisionFilter.mask == 0.toJs and
+        b.getY < state.canvas.clientHeight.float - 
+        groundHeight - (b.circleRadius.to(float)):
 
-          b.collisionFilter.mask = 2
+        b.collisionFilter.mask = 2
 
-      for i in countdown(toDelete.high, toDelete.low):
-        state.canon.bullets.delete(toDelete[i])
-        if (let a = state.canon.flyingBullets.find(toDelete[i]); a >= 0):
-          state.canon.flyingBullets.delete(a)
+    for i in countdown(toDelete.high, toDelete.low):
+      state.canon.bullets.delete(toDelete[i])
+      if (let a = state.canon.flyingBullets.find(toDelete[i]); a >= 0):
+        state.canon.flyingBullets.delete(a)
 
-      if toDelete.len > 0:
-        # Lower each index by the number of bullets deleted since we deleted one
-        for i in state.canon.flyingBullets.mitems:
-          for di in toDelete:
-            if i > di:
-              dec i
+    if toDelete.len > 0:
+      # Lower each index by the number of bullets deleted since we deleted one
+      for i in state.canon.flyingBullets.mitems:
+        for di in toDelete:
+          if i > di:
+            dec i
 
     # Freeze the simulation if every non-static body is sleeping
     var freeze = true
-    for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
+    for b in Matter.Composite.allBodies(state.engine.world).to(seq[JsObject]):
       if not b.isSleeping.to(bool) and not b.isStatic.to(bool):
         freeze = false
 
       if b.speed.to(float) > 1000:
-        Body.setSpeed(b, 10)
+        Matter.Body.setSpeed(b, 10)
     
     if freeze and not state.canon.base.dragging and not state.canon.dragging and 
       not state.draggingPoint and not (state.followBullet and state.canon.flyingBullets.len > 0):
@@ -979,27 +986,27 @@ proc onBeforeRender(state: var ParabolaState, event: JsObject) =
   #    y: state.render.options.height.to(float) * scaleFactor * -0.5
   #  }
 
-  #  Bounds.translate(state.render.bounds, translate)
+  #  Matter.Bounds.translate(state.render.bounds, translate)
 
   #  # update mouse
-  #  Mouse.setScale(mouse, state.boundsScale)
-  #  Mouse.setOffset(mouse, state.render.bounds.min)
+  #  Matter.Mouse.setScale(mouse, state.boundsScale)
+  #  Matter.Mouse.setOffset(mouse, state.render.bounds.min)
 
   ## get vector from mouse relative to centre of viewport
   #var viewportCentre = JsObject{
   #  x: state.render.options.width * toJs 0.5,
   #  y: state.render.options.height * toJs 0.5
   #}
-  #let deltaCentre = Vector.sub(mouse.absolute, viewportCentre)
-  #let centreDist = Vector.magnitude(deltaCentre)
+  #let deltaCentre = Matter.Vector.sub(mouse.absolute, viewportCentre)
+  #let centreDist = Matter.Vector.magnitude(deltaCentre)
 
   ## translate the view if mouse has moved over 50px from the centre of viewport
   #if centreDist.to(float) > 50:
   #  # create a vector to translate the view, allowing the user to control view speed
-  #  let direction = Vector.normalise(deltaCentre)
+  #  let direction = Matter.Vector.normalise(deltaCentre)
   #  let speed = min(10, pow(centreDist.to(float) - 50, 2) * 0.0002)
 
-  #  let translate = Vector.mult(direction, speed)
+  #  let translate = Matter.Vector.mult(direction, speed)
 
   #  # prevent the view moving outside the extens (bounds)
   #  if to(state.render.bounds.min.x + translate.x < state.bounds.min.x, bool):
@@ -1015,10 +1022,10 @@ proc onBeforeRender(state: var ParabolaState, event: JsObject) =
   #    translate.y = state.bounds.max.y - state.render.bounds.max.y
 
   #  # move the view
-  #  Bounds.translate(state.render.bounds, translate)
+  #  Matter.Bounds.translate(state.render.bounds, translate)
 
   #  # we must update the mouse too
-  #  Mouse.setOffset(mouse, state.render.bounds.min)
+  #  Matter.Mouse.setOffset(mouse, state.render.bounds.min)
 
 proc drawVelocityArrows(state: ParabolaState, ctx: JsObject) = 
   for bi in state.canon.flyingBullets:
@@ -1227,7 +1234,7 @@ proc drawAngle(state: ParabolaState, ctx: JsObject) =
 
 proc onAfterRender(state: var ParabolaState, event: JsObject) = 
   try:
-    Render.startViewTransform(state.render)
+    Matter.Render.startViewTransform(state.render)
     let ctx = state.render.context
 
     state.drawVelocityArrows(ctx)
@@ -1239,7 +1246,7 @@ proc onAfterRender(state: var ParabolaState, event: JsObject) =
       state.drawHeight(ctx)
       state.drawRange(ctx)
 
-    discard Render.endViewTransform(state.render)
+    discard Matter.Render.endViewTransform(state.render)
   except:
     state.pause()
     raise
@@ -1279,7 +1286,7 @@ proc loadEvents(state: var ParabolaState) =
     if not state.startedRendering: return
 
     if state.canon.dragging:
-      let targetAngle = Vector.angle(state.canon.pivot.jsVec, 
+      let targetAngle = Matter.Vector.angle(state.canon.pivot.jsVec, 
         state.mouse.position).to(float) - state.canon.dragOffset
       state.rotateCanon(targetAngle - state.canon.body.angle.to(float))
       state.calcTrajectory()
@@ -1312,18 +1319,18 @@ proc loadEvents(state: var ParabolaState) =
         elif state.trajectory.pinnedPoint in state.trajectory.points:
           state.trajectory.pinnedPoint = -1
           state.updatePointAccordion()
-      elif Bounds.contains(state.canon.base.body.bounds, state.mouse.position).to(bool):
+      elif Matter.Bounds.contains(state.canon.base.body.bounds, state.mouse.position).to(bool):
         state.canon.base.dragging = true
         state.canon.base.dragOffset = state.canon.base.body.getY - state.mouse.position.y.to(float)
-      elif Bounds.contains(state.canon.body.bounds, state.mouse.position).to(bool): 
+      elif Matter.Bounds.contains(state.canon.body.bounds, state.mouse.position).to(bool): 
         state.canon.dragging = true
-        state.canon.dragOffset = Vector.angle(state.canon.pivot.jsVec, 
+        state.canon.dragOffset = Matter.Vector.angle(state.canon.pivot.jsVec, 
           state.mouse.position).to(float) - state.canon.body.angle.to(float)
-      elif Bounds.contains(state.canon.platform.body.bounds, state.mouse.position).to(bool):
+      elif Matter.Bounds.contains(state.canon.platform.body.bounds, state.mouse.position).to(bool):
         state.canon.base.dragging = true
         state.canon.base.dragOffset = state.canon.base.body.getY - state.mouse.position.y.to(float)
       elif state.frozen or not state.paused:
-        MouseConstraint.onmousedown(state.mouseCons, Composite.allBodies(state.engine.world))
+        Matter.MouseConstraint.onmousedown(state.mouseCons, Matter.Composite.allBodies(state.engine.world))
         if state.frozen:
           state.unfreeze()
 
@@ -1337,7 +1344,7 @@ proc loadEvents(state: var ParabolaState) =
 
     case event.button.to(int)
     of 0:
-      MouseConstraint.onmouseup(state.mouseCons)
+      Matter.MouseConstraint.onmouseup(state.mouseCons)
    
       if state.draggingPoint and state.trajectory.closestPoint in state.trajectory.points:
         state.trajectory.pinnedPoint = state.trajectory.closestPoint
@@ -1370,7 +1377,7 @@ proc loadEvents(state: var ParabolaState) =
     state.draggingPoint = false
 
     # To stop the mouse constraint
-    MouseConstraint.onmouseup(state.mouseCons)
+    Matter.MouseConstraint.onmouseup(state.mouseCons)
     #state.mouseCons.mouse.button = -1
 
   proc onWheel(event: JsObject) = 
@@ -1410,22 +1417,22 @@ proc loadEvents(state: var ParabolaState) =
 
   state.mouse.element.addEventListener("wheel", state.onWheel)
 
-  Events.on(state.engine, "afterUpdate", 
+  Matter.Events.on(state.engine, "afterUpdate", 
     (event: JsObject) => state.onAfterUpdate(event))
 
-  Events.on(state.engine, "collisionStart", 
+  Matter.Events.on(state.engine, "collisionStart", 
     (event: JsObject) => state.onCollisionStart(event))
 
-  Events.on(state.render, "beforeRender", 
+  Matter.Events.on(state.render, "beforeRender", 
     (event: JsObject) => state.onBeforeRender(event))
 
-  Events.on(state.render, "afterRender", 
+  Matter.Events.on(state.render, "afterRender", 
     (event: JsObject) => state.onAfterRender(event))
 
-  Events.on(state.engine.world, "afterAdd", 
+  Matter.Events.on(state.engine.world, "afterAdd", 
     (event: JsObject) => state.onAfterAdd(event))
 
-  Events.on(state.mouseCons, "startdrag", 
+  Matter.Events.on(state.mouseCons, "startdrag", 
     (event: JsObject) => state.onStartdrag(event))
 
 proc onImagesLoaded(state: var ParabolaState) = 
@@ -1433,30 +1440,29 @@ proc onImagesLoaded(state: var ParabolaState) =
   state.canon.base.imgSize = state.render.textures[canonTexture].sizeVec()
   state.canon.platform.imgSize = state.render.textures[canonPlatformTexture].sizeVec()
 
-  Body.scale(state.canon.body, state.canon.imgSize.x, state.canon.imgSize.y)
-  Body.scale(state.canon.base.body, state.canon.base.imgSize.x, 
+  Matter.Body.scale(state.canon.body, state.canon.imgSize.x, state.canon.imgSize.y)
+  Matter.Body.scale(state.canon.base.body, state.canon.base.imgSize.x, 
     state.canon.base.imgSize.y)
-  Body.scale(state.canon.platform.body, state.canon.platform.imgSize.x, 
+  Matter.Body.scale(state.canon.platform.body, state.canon.platform.imgSize.x, 
     state.canon.platform.imgSize.y)
 
   state.onResize(first = true)
   state.rotateCanonBack(degToRad(60d))
   state.calcTrajectory()
 
-  Render.run(state.render)
+  Matter.Render.run(state.render)
 
   state.startedRendering = true
 
 #proc typesetMathjax(): Future[void] = 
 #  var promise = newPromise() do (resolve: proc()):
-#    # Render all MathJax expressions synchronously
+#    # Matter.Render all MathJax expressions synchronously
 #    (resolve)
 
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
   # Load wrap's plugin and load matter aliases to point to the correct values
   Matter.use("matter-wrap")
-  loadMatterAliases()
 
   let gravity = state.trajectory.state.gravity.jsVec()
   gravity.scale = 1
@@ -1481,14 +1487,14 @@ proc load*(state: var ParabolaState) =
     }
   })
 
-  state.runner = Runner.create(JsObject{fps: fps})
-  Runner.run(state.runner, state.engine)
+  state.runner = Matter.Runner.create(JsObject{fps: fps})
+  Matter.Runner.run(state.runner, state.engine)
 
   state.bounds = JsObject{min: JsObject{x: 0, y: 0}, max: JsObject{x: state.canvas.clientWidth.float * 0.6, y: state.canvas.clientHeight.float * 0.5}}
 
   # Create and add all bodies to the world
   # onResize will set the correct positions
-  state.canon.body = Bodies.rectangle(0, 0, 1, 1, JsObject{
+  state.canon.body = Matter.Bodies.rectangle(0, 0, 1, 1, JsObject{
     zIndex: 3, isStatic: true, collisionFilter: JsObject{mask: 0}, label: cstring"Canon",
     render: JsObject{sprite: JsObject{
       texture: cstring canonTexture, 
@@ -1496,7 +1502,7 @@ proc load*(state: var ParabolaState) =
     }}
   })
 
-  state.canon.base.body = Bodies.rectangle(0, 0, 1, 1, JsObject{
+  state.canon.base.body = Matter.Bodies.rectangle(0, 0, 1, 1, JsObject{
     zIndex: 4, isStatic: true, collisionFilter: JsObject{mask: 0}, label: cstring"Base",
     render: JsObject{sprite: JsObject{
       texture: cstring canonBaseTexture, 
@@ -1505,7 +1511,7 @@ proc load*(state: var ParabolaState) =
   })
   state.canon.base.body.xratio = canonXRatio
 
-  state.canon.platform.body = Bodies.rectangle(0, 0, 1, 1, JsObject{
+  state.canon.platform.body = Matter.Bodies.rectangle(0, 0, 1, 1, JsObject{
     zIndex: 1, isStatic: true, collisionFilter: JsObject{mask: 0}, label: cstring"Platform",
     render: JsObject{sprite: JsObject{
       texture: cstring canonPlatformTexture, 
@@ -1514,7 +1520,7 @@ proc load*(state: var ParabolaState) =
   })
   state.canon.platform.body.xratio = canonXRatio
 
-  state.ground = Bodies.rectangle(0, 0, state.canvas.clientWidth * 1000, groundHeight * 2, 
+  state.ground = Matter.Bodies.rectangle(0, 0, state.canvas.clientWidth * 1000, groundHeight * 2, 
     JsObject{zIndex: -1, friction: 1, frictionStatic: 1, isStatic: true, 
       label: cstring"Ground", collisionFilter: JsObject{category: 2, mask: 3}
     }
@@ -1522,44 +1528,44 @@ proc load*(state: var ParabolaState) =
   state.ground.xratio = 0.5
   state.ground.yratio = 1
 
-  state.thingy = Bodies.rectangle(state.canvas.clientWidth / 2, 
+  state.thingy = Matter.Bodies.rectangle(state.canvas.clientWidth / 2, 
     state.canvas.clientHeight.float * 0.6, 20, 80, 
     JsObject{zIndex: 0, isStatic: false, label: cstring"Thingy", frictionAir: 0.1, 
       friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
       collisionFilter: JsObject{category: 2, mask: 3}, sleepThreshold: 1,
   })
-  #Body.setInertia(state.thingy, 0.1)
+  #Matter.Body.setInertia(state.thingy, 0.1)
 
-  state.mouse = Mouse.create(state.canvas)
+  state.mouse = Matter.Mouse.create(state.canvas)
   state.render.mouse = state.mouse
   
-  state.mouseCons = MouseConstraint.create(state.engine, JsObject{
+  state.mouseCons = Matter.MouseConstraint.create(state.engine, JsObject{
     mouse: state.mouse, collisionFilter: JsObject{category: 2, mask: 3}, 
     constraint: JsObject{render: JsObject{visible: false}, stiffness: 1}})
   #state.mouseCons.constraint.render.visible = false
 
-  let roof = Bodies.rectangle(0, -100, 1000, 20, JsObject{
+  let roof = Matter.Bodies.rectangle(0, -100, 1000, 20, JsObject{
     isStatic: true, label: cstring"Roof"
   })
   roof.xratio = 0.5
 
   state.loadEvents()
 
-  Composite.add(state.engine.world, toJs [
+  Matter.Composite.add(state.engine.world, toJs [
     state.canon.body, state.mouseCons,
     state.thingy, state.canon.base.body,
     state.canon.platform.body,
     # Walls
     roof, # up
-    # Bodies.rectangle(690, 250, 20, 500, JsObject{isStatic: true}), # right
+    # Matter.Bodies.rectangle(690, 250, 20, 500, JsObject{isStatic: true}), # right
     state.ground, # down
-    # Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
+    # Matter.Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
   ])
 
   # Wait until all textures are loaded
   var loadedImgCount = 0
   var images = newSeq[cstring]()
-  for b in Composite.allBodies(state.engine.world).to(seq[JsObject]):
+  for b in Matter.Composite.allBodies(state.engine.world).to(seq[JsObject]):
     if not b.render.sprite.texture.isUndefined and not to(b.render.sprite.texture in state.render.textures, bool):
       images.add b.render.sprite.texture.to(cstring)
 
@@ -1577,10 +1583,10 @@ proc load*(state: var ParabolaState) =
 
 ## Reloads the simulation
 proc reload*(state: var ParabolaState) =
-  Composite.clear(state.engine.world)
-  Engine.clear(state.engine)
-  Render.stop(state.render)
-  Runner.stop(state.runner)
+  Matter.Composite.clear(state.engine.world)
+  Matter.Engine.clear(state.engine)
+  Matter.Render.stop(state.render)
+  Matter.Runner.stop(state.runner)
   state.unloadEvents()
   state = initParabolaState()
   getElementById("point-input-f").checked = false
@@ -1595,7 +1601,7 @@ proc renderLeftDiv(state: var ParabolaState): VNode =
       text "Matter-js simulation"
       proc onclick(e: Event, n: VNode) = 
         n.dom.focus()
-      # Doing this because I saw it on matter-js's Render._createCanvas
+      # Doing this because I saw it on matter-js's Matter.Render._createCanvas
       proc oncontextmenu(ev: Event, _: VNode) = ev.preventDefault()
       proc ondragstart(ev: Event, _: VNode) = ev.preventDefault()
 
@@ -1679,9 +1685,7 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
           li(): 
             text r"\(x_{max} = v\:\cdot\:t = d\)"
 
-proc renderStateAccordion(state: var ParabolaState): VNode =
-  let siInitialState = state.trajectory.state.toMu()
- 
+proc renderStateAccordion(state: var ParabolaState): VNode = 
   proc onInputHChange(e: Event, n: VNode) = 
     if not state.startedRendering: return
 
@@ -1723,18 +1727,32 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
     var g = 0.0
 
     discard parseFloat($n.value, g)
-    g = g.clamp(3, 30).fromMuAcceleration().round(state.floatPrecision)
+    g = g.clamp(0.7, 23.1).fromMuAcceleration().round(state.floatPrecision)
     state.trajectory.state.gravity.y = g / gravityFactor
     state.engine.gravity.y = state.trajectory.state.gravity.y
     state.calcTrajectory()
   
+  proc onPlanetClick(g: float): auto = 
+    proc() = 
+      let g = g.clamp(0.7, 23.1).fromMuAcceleration().round(state.floatPrecision)
+      state.trajectory.state.gravity.y = g / gravityFactor
+      state.engine.gravity.y = state.trajectory.state.gravity.y
+      state.calcTrajectory()
+  
+  proc onGAccordChange(checked: bool) = 
+    let ele = getElementById("accordion-g-arrow")
+    if checked:
+      ele.style.setProperty("transform", cstring"rotate(90deg)")
+    else:
+      ele.style.removeProperty("transform")
+
   buildHtml form(class = "form-horizontal"):
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "state-input-h"): text "Height"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-h", 
-          step = state.inputStep, onchange = onInputHChange)
+          step = cstring state.inputStep, onchange = onInputHChange)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -1748,7 +1766,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
         label(class = "form-label", `for` = "state-input-s"): text "Speed"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-s", 
-          step = state.inputStep, onchange = onInputSChange)
+          step = cstring state.inputStep, onchange = onInputSChange)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -1763,13 +1781,50 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-vy", 
           readonly = true)
-    
-    tdiv(class = "form-group"): 
-      tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "state-input-g"): text "Gravity"
-      tdiv(class = "col-9 col-sm-12"):
-        input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
-          step = state.inputStep, onchange = onInputGChange)
+
+    #tdiv(class = "form-group"): 
+    #  tdiv(class = "accordion"):
+    #    input(`type` = "checkbox", name  = "accordion-checkbox", 
+    #      id = "accordion-g", hidden = true, checked = false)
+    #    label(class = "accordion-header", `for` = "accordion-g"):
+    #      italic(class = "icon icon-arrow-right mr-1")
+      
+    #    tdiv(class = "col-3 col-sm-12"):
+    #      label(class = "form-label", `for` = "state-input-g"): text "Gravity"
+    #    tdiv(class = "col-9 col-sm-12"):
+    #      input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
+    #        step = state.inputStep, onchange = onInputGChange)
+
+    #    tdiv(class = "accordion-body"):
+    #      text "asdasd"
+        
+    tdiv(class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-g", hidden = true, checked = false, 
+        onchange = proc(_: Event, n: VNode) = onGAccordChange(n.dom.checked))
+
+      label(class = "accordion-header", `for` = "accordion-g", style = "padding: 0 0 0.6rem;".toCss):    
+        tdiv(class = "form-group"): 
+          tdiv(class = "col-3 col-sm-12", style = "display: ruby;".toCss):
+            italic(id = "accordion-g-arrow", class = "icon icon-arrow-right mr-1")
+            # We do not use `for` = "state-input-g" here because we want the click
+            # to show the planets' gravities
+            label(class = "form-label"):
+              text "Gravity"
+              proc onclick() = 
+                let ele = getElementById("accordion-g")
+                ele.checked = not ele.checked
+                onGAccordChange(ele.checked)
+
+          tdiv(class = "col-9 col-sm-12"):
+            input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
+              step = state.inputStep, onchange = onInputGChange)
+
+      tdiv(class = "accordion-body"):
+        for e, (name, gravity) in gravities:
+          button(`type` = "button", class = "btn", onclick = onPlanetClick(gravity),
+            style = "display: inline;".toCss):
+            text name
 
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
@@ -1932,20 +1987,20 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
         label(class = "form-label", `for` = "point-input-x"): text "Pos X"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-x", 
-          step = state.inputStep, onchange = onInputXChange)
+          step = cstring state.inputStep, onchange = onInputXChange)
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "point-input-y"): text "Pos Y"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-y", 
-          step = state.inputStep, onchange = onInputYChange, readonly = true)
+          step = cstring state.inputStep, onchange = onInputYChange, readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "point-input-y"): text "Time"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-t", 
-          step = state.inputStep, onchange = onInputTChange)
+          step = cstring state.inputStep, onchange = onInputTChange)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -2071,7 +2126,7 @@ proc renderTrajectories(state: var ParabolaState): VNode =
         state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - state.trajectory.state.angleDeg))
         state.moveCanonTo(state.canvas.clientHeight.float - groundHeight.float - 
           state.trajectory.state.height + state.canonYDiff)
-
+        state.engine.gravity.y = state.trajectory.state.gravity.y
         state.calcTrajectory()
 
   proc onRemoveClick(e: int): auto = 
