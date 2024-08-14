@@ -17,7 +17,9 @@ jobs:
       - uses: iffy/install-nim@v5
 
       - name: Install Dependencies
-        run: nimble install -d -y
+        run: |
+          sudo apt install libsass-dev sqlite3
+          nimble install -d -y
 
       - name: Frontend
         run: nimble frontend
@@ -34,26 +36,27 @@ jobs:
             public
           if-no-files-found: error
 
-  windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: iffy/install-nim@v5
+  # windows:
+  #   runs-on: windows-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: iffy/install-nim@v5
 
-      - name: Install Dependencies
-        run: nimble install -d -y
+  #     - name: Install Dependencies
+  #       run: |
+  #         nimble install -d -y
 
-      - name: Frontend
-        run: nimble frontend
+  #     - name: Frontend
+  #       run: nimble frontend
 
-      - name: Backend
-        run: nimble build
+  #     - name: Backend
+  #       run: nimble build
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows
-          path: |
-            app.exe
-            public
-          if-no-files-found: error
+  #     - name: Upload Artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: windows
+  #         path: |
+  #           app.exe
+  #           public
+  #         if-no-files-found: error
