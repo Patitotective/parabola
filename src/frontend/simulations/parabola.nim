@@ -143,6 +143,12 @@ proc calcTime(initialState: CanonState, y: float, sign: bool): float =
 proc magnitude(v: Vec): float = 
   sqrt(v.x^2 + v.y^2)
 
+proc path(p: static string): string = 
+  when defined(relativePath):
+    "./" & p
+  else:
+    "/public/" & p
+
 const
   fps = 60
   timeScale = 0.025
@@ -160,9 +166,9 @@ const
   canonSpeedChange = 1.0
   canonAngleChangeDeg = 3.0
 
-  canonTexture = "/public/img/canon.png"
-  canonBaseTexture = "/public/img/canonBase.png"
-  canonPlatformTexture = "/public/img/canonPlatform.png"
+  canonTexture = path "img/canon.png"
+  canonBaseTexture = path "img/canonBase.png"
+  canonPlatformTexture = path "img/canonPlatform.png"
 
   trajectoryStrokeStyles = ["Orange", "Salmon", "Crimson", "Pink", "HotPink", "Tomato", 
   "Gold", "Khaki", "Violet", "SlateBlue", "YellowGreen", "LightSeaGreen", 
@@ -524,7 +530,7 @@ proc updatePointAccordion(state: var ParabolaState) =
     getElementById("point-input-vx").value = ""
     getElementById("point-input-vy").value = ""
     getElementById("point-input-s").value = ""
-    #getElementById("point-input-x").setAttribute("disabled", "")
+
   var siInitialState = state.trajectory.state.toMu()
   siInitialState.gravity = siInitialState.gravity * gravityFactor
 
@@ -646,8 +652,8 @@ proc calcTrajectory(state: var ParabolaState) =
   elif prevLastPoint:
     state.trajectory.pinnedPoint = state.trajectory.points.high
 
-  state.updatePointAccordion()
   state.updateStateAccordion()
+  state.updatePointAccordion()
   state.updateFormulaAccordion()
 
 ## The difference of canon's y respect base's y
@@ -1818,7 +1824,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
           tdiv(class = "col-9 col-sm-12"):
             input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
-              step = state.inputStep, onchange = onInputGChange)
+              step = cstring state.inputStep, onchange = onInputGChange)
 
       tdiv(class = "accordion-body"):
         for e, (name, gravity) in gravities:

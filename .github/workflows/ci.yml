@@ -5,10 +5,12 @@ on:
     paths:
       - "src/**"
       - "public/**"
+      - ".github/workflows/ci.yml"
   pull_request:
     paths:
       - "src/**"
       - "public/**"
+      - ".github/workflows/ci.yml"
 jobs:
   ubuntu:
     runs-on: ubuntu-latest
@@ -22,18 +24,14 @@ jobs:
           nimble install -d -y
 
       - name: Frontend
-        run: nimble frontend
-
-      - name: Backend
-        run: nimble build
+        run: nimble htmlpage
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ubuntu
           path: |
-            app
-            public
+            dist
           if-no-files-found: error
 
   # windows:

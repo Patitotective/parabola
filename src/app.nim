@@ -9,6 +9,9 @@ proc getKarax(ctx: Context) {.async.} =
   resp htmlResponse readFile("public/karax.html") %
     {
       "title": config.title,
+      "frontend": "/public/js/frontend.js",
+      "style": "/public/css/style.css",
+      "favicon": "/public/img/favicon.ico"
       # "timestamp": encodeUrl(CompileDate & CompileTime),
       # "ga": config.ga
     }.newStringTable()

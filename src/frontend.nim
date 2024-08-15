@@ -5,7 +5,7 @@ import karax/[karax, kajax, karaxdsl, vdom, vstyles, i18n, jdict, languages]
 
 # import matter
 import frontend/[routes, utils, patterns]
-import frontend/simulations/parabola
+import frontend/simulations/[parabola, utils]
 
 type
   State = ref object
@@ -44,27 +44,17 @@ var state = newState()
 
 # addTranslation(esCo, "s/0/")
 
-proc renderHome(params: Params): VNode =
-  #discard setTimeout(proc() = navigateTo("/parabola"), 10)
-  navigateTo("/parabola")
-
-  buildHtml(tdiv):
-    text "Welcome to my grado project"
-
 proc render(): VNode =
-  buildHtml(tdiv):
-    # renderHeader()
-    state.location.route([
-      r("/", proc(params: Params): VNode =
-        state.parabola.render()
-      )
-    ])
+  state.parabola.render()
 
 proc postRender() =
   # Since matter needs to find the canvas element, if we load the simulation before karax has created the canvas element it won't work
   if not state.matterLoaded:
-    state.parabola.load()
-    state.matterLoaded = true
+    if not MathJax.typesetPromise.isNil:
+      state.parabola.load()
+      state.matterLoaded = true
+    else:
+      discard setTimeout(postRender, 100)
 
 # This event is (usually only) called when the user moves back in history
 # Here we fake the moving-back-in-history action so it doesn't actually reload the page
