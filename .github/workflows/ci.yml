@@ -21,6 +21,7 @@ jobs:
       - name: Install Dependencies
         run: |
           sudo apt install libsass-dev sqlite3
+          git submodule init
           nimble install kdl
           nimble install -d -y
 
