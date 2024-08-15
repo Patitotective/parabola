@@ -1,31 +1,56 @@
 import std/os
 import sass
 
-import config as _
+#import config as _
+
+#proc buildCSS*(cssFilename = "style") =
+#  let publicLoc = "public"
+#  var includePaths: seq[string] = @[]
+#  # Check for a styles override.
+#  var hostname = config.hostname
+#  if not dirExists(hostname):
+#    hostname = "localhost.local"
+
+#  let dir = getCurrentDir() / hostname / "public"
+#  includePaths.add(dir / "css")
+#  createDir(publicLoc / "images")
+#  let logo = publicLoc / "images" / "logo.png"
+#  removeFile(logo)
+#  createSymlink(
+#    dir / "images" / "logo.png",
+#    logo
+#  )
+
+#  let cssLoc = publicLoc / "css"
+#  sass.compileFile(
+#    cssLoc / (cssFilename & ".sass"),
+#    cssLoc / (cssFilename & ".css"),
+#    includePaths=includePaths
+#  )
 
 proc buildCSS*(cssFilename = "style") =
-  let publicLoc = "public"
-  var includePaths: seq[string] = @[]
-  # Check for a styles override.
-  var hostname = config.hostname
-  if not dirExists(hostname):
-    hostname = "localhost.local"
+  #let publicLoc = "public"
+  #var includePaths: seq[string] = @[]
+  ## Check for a styles override.
+  #var hostname = config.hostname
+  #if not dirExists(hostname):
+  #  hostname = "localhost.local"
 
-  let dir = getCurrentDir() / hostname / "public"
-  includePaths.add(dir / "css")
-  createDir(publicLoc / "images")
-  let logo = publicLoc / "images" / "logo.png"
-  removeFile(logo)
-  createSymlink(
-    dir / "images" / "logo.png",
-    logo
-  )
+  #let dir = getCurrentDir() / hostname / "public"
+  #includePaths.add(dir / "css")
+  #createDir(publicLoc / "images")
+  #let logo = publicLoc / "images" / "logo.png"
+  #removeFile(logo)
+  #createSymlink(
+  #  dir / "images" / "logo.png",
+  #  logo
+  #)
 
-  let cssLoc = publicLoc / "css"
+  let cssLoc = currentSourcePath.parentDir.parentDir / "public" / "css"
   sass.compileFile(
     cssLoc / (cssFilename & ".sass"),
     cssLoc / (cssFilename & ".css"),
-    includePaths=includePaths
+    #includePaths=includePaths
   )
 
 when isMainModule:

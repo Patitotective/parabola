@@ -2151,7 +2151,7 @@ proc renderTrajectories(state: var ParabolaState): VNode =
 
         if not kxi.surpressRedraws: redraw(kxi)
 
-  buildHtml tdiv(class = "form-horizontal", style = "margin: .4rem .2rem -0.3rem 1.3rem;".toCss):
+  buildHtml tdiv(class = "form-horizontal", style = "margin: 0rem .2rem -0.3rem 1.3rem;".toCss):
     tdiv(class = "form-group"):
       tdiv(class = "col-3"):
         label(class = "form-label tooltip tooltip-right", `data-tooltip` = "Double-click a trajectory to delete it"):
