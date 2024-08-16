@@ -12,10 +12,11 @@ bin           = @["app"]
 # Dependencies
 
 requires "nim >= 2.0.0"
-requires "karax >= 1.2.2"
-requires "prologue >= 0.6.4"
-requires "sass >= 0.2.0"
-requires "kdl >= 2.0.1"
+requires "karax == 1.2.2"
+requires "prologue == 0.6.4"
+requires "sass == 0.2.0"
+requires "kdl == 2.0.1"
+requires "ni18n == 0.1.0"
 
 task css, "Builds the CSS":
   exec "nimble c -r --mm:refc src/buildcss"
@@ -30,9 +31,12 @@ task frontend, "Compiles the frontend to JavaScript and builds the CSS":
 import std/strtabs
 import src/config as _
 
+task htmljs, "Generates single html page's JavaScript":
+  exec "nim js -d:relativePath --out:dist/app.js src/frontend"
+
 task htmlpage, "Generates a single html page":
   exec "nimble css"
-  exec "nim js -d:relativePath --out:dist/app.js src/frontend"
+  exec "nimble htmljs"
 
   mkDir "dist"
   cpFile "public/css/style.css", "dist/style.css"
