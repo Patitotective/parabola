@@ -243,7 +243,13 @@ proc strfloat(state: ParabolaState, f: float): string =
 
 proc inputStep(state: ParabolaState): string = 
   if state.floatPrecision > 0:
-    &"0.{'0'.repeat(state.floatPrecision-1)}1"
+    let places = state.floatPrecision - 1
+    #  if state.floatPrecision > 1:
+    #    state.floatPrecision - 2
+    #  else: state.floatPrecision
+
+    &"0.{'0'.repeat(places)}1"
+    #"0.1"
   else: "1" 
 
 proc pause(state: var ParabolaState) = 
@@ -743,8 +749,8 @@ proc fireBullet(state: var ParabolaState) =
     if state.canon.bullets[b].getPos() == bullet.getPos():
       return
 
-  # If the limit is exceed by the double, remove half of the bullets
-  if state.canon.bullets.len + 1 > state.canon.bulletsLimit * 2:
+  # If the limit is exceed by the triple, remove half of the bullets
+  if state.canon.bullets.len + 1 > state.canon.bulletsLimit * 3:
     var toDelete: seq[int]
     for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit):
       Matter.Composite.remove(state.engine.world, state.canon.bullets[i])
@@ -752,15 +758,14 @@ proc fireBullet(state: var ParabolaState) =
 
     for i in countdown(toDelete.high, toDelete.low):
       state.canon.bullets.delete(toDelete[i])
+      
       if (let a = state.canon.flyingBullets.find(toDelete[i]); a >= 0):
         state.canon.flyingBullets.delete(a)
 
-    if toDelete.len > 0:
-      # Lower each index by the number of bullets deleted since we deleted one
-      for i in state.canon.flyingBullets.mitems:
-        for di in toDelete:
-          if i > di:
-            dec i
+      # We have to lower the indices greater than the one we deleted...
+      for fi in state.canon.flyingBullets.mitems:
+        if fi > toDelete[i]:
+          dec fi
 
   elif state.canon.bullets.len + 1 > state.canon.bulletsLimit:
     for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit):
@@ -769,7 +774,7 @@ proc fireBullet(state: var ParabolaState) =
       # able to collide with anything, but still since they are sleeping
       if state.canon.bullets[i].isSleeping.to(bool):
         Matter.Sleeping.set(state.canon.bullets[i], false)
-      # If the bullet of index 0 is in flyingBullets, delete it
+
       if (let a = state.canon.flyingBullets.find(i); a >= 0):
         state.canon.flyingBullets.delete(a)
 
@@ -1692,48 +1697,27 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
             text r"\(x_{max} = v\:\cdot\:t = d\)"
 
 proc renderStateAccordion(state: var ParabolaState): VNode = 
-  proc onInputHChange(e: Event, n: VNode) = 
+  proc changeHeightTo(h: float) = 
     if not state.startedRendering: return
 
-    var h = 0.0
-
-    discard parseFloat($n.value, h)
-    h = h.fromMuDistance().round(state.floatPrecision).
+    var h = h.fromMuDistance().round(state.floatPrecision).
       clamp(0.0..state.canonYRange.b)
 
     state.moveCanonTo(state.canvas.clientHeight.float - 
       groundHeight.float - h + state.canonYDiff)
     state.calcTrajectory()
   
-  proc onInputAChange(e: Event, n: VNode) = 
+  proc changeSpeedTo(s: float) = 
     if not state.startedRendering: return
-
-    var a = 0
-
-    discard parseInt($n.value, a)
-    a = a.clamp(0..360)
-    state.rotateCanon(degToRad(
-      state.canon.normalizedAngleDeg() - a.float
-    ))
-    state.calcTrajectory()
-
-  proc onInputSChange(e: Event, n: VNode) = 
-    if not state.startedRendering: return
-
-    var s = 0.0
-
-    discard parseFloat($n.value, s)
-    s = s.fromMuSpeed().round(state.floatPrecision)
+  
+    var s = s.fromMuSpeed().round(state.floatPrecision)
     state.trajectory.state.setSpeed(s)
     state.calcTrajectory()
-  
-  proc onInputGChange(e: Event, n: VNode) = 
+
+  proc changeGravTo(g: float) = 
     if not state.startedRendering: return
-
-    var g = 0.0
-
-    discard parseFloat($n.value, g)
-    g = g.clamp(0.7, 23.1).fromMuAcceleration().round(state.floatPrecision)
+  
+    var g = g.clamp(0.7, 23.1).fromMuAcceleration().round(state.floatPrecision)
     state.trajectory.state.gravity.y = g / gravityFactor
     state.engine.gravity.y = state.trajectory.state.gravity.y
     state.calcTrajectory()
@@ -1758,21 +1742,60 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
         label(class = "form-label", `for` = "state-input-h"): text "Height"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-h", 
-          step = cstring state.inputStep, onchange = onInputHChange)
+          step = cstring state.inputStep):
+          proc onchange(e: Event, n: VNode) = 
+            var h = 0.0
+            discard parseFloat($n.value, h)
+            changeHeightTo(h)
+
+          proc onwheel(e: Event, n: VNode) = 
+            e.preventDefault()
+
+            var h = 0.0
+            discard parseFloat($n.value, h)
+            if e.toJs.wheelDelta.to(float) > 0: h += 1
+            else: h -= 1
+
+            changeHeightTo(h)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "state-input-a"): text "Angle"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-a", 
-          step = "1", onchange = onInputAChange)
+          step = "1"):
+          proc onchange(e: Event, n: VNode) = 
+            if not state.startedRendering: return
+
+            var a = 0
+
+            discard parseInt($n.value, a)
+            a = a.clamp(0..360)
+            state.rotateCanon(degToRad(
+              state.canon.normalizedAngleDeg() - a.float
+            ))
+            state.calcTrajectory()
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "state-input-s"): text "Speed"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-s", 
-          step = cstring state.inputStep, onchange = onInputSChange)
+          step = cstring state.inputStep):
+          proc onchange(e: Event, n: VNode) = 
+            var s = 0.0
+            discard parseFloat($n.value, s)
+            changeSpeedTo(s)
+
+          proc onwheel(e: Event, n: VNode) = 
+            e.preventDefault()
+
+            var s = 0.0
+            discard parseFloat($n.value, s)
+            if e.toJs.wheelDelta.to(float) > 0: s += 1
+            else: s -= 1
+
+            changeSpeedTo(s)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -1824,7 +1847,19 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
           tdiv(class = "col-9 col-sm-12"):
             input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
-              step = cstring state.inputStep, onchange = onInputGChange)
+              step = cstring state.inputStep):
+              proc onchange(e: Event, n: VNode) = 
+                var g = 0.0
+                discard parseFloat($n.value, g)
+                changeGravTo(g)
+
+              proc onwheel(e: Event, n: VNode) = 
+                e.preventDefault()
+                var g = 0.0
+                discard parseFloat($n.value, g)
+                if e.toJs.wheelDelta.to(float) > 0: g += 1
+                else: g -= 1
+                changeGravTo(g)
 
       tdiv(class = "accordion-body"):
         for e, (name, gravity) in gravities:
@@ -1849,13 +1884,10 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
   let liStyle = "margin-top: 20px;".toCss
   let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
-  proc onInputXChange(ev: Event, n: VNode) = 
+  proc changeXTo(x: float) = 
     if not state.startedRendering or state.trajectory.points.len == 0: return
 
-    var x = 0.0
-
-    discard parseFloat($n.value, x)
-    x = x.fromMuDistance().round(state.floatPrecision)
+    var x = x.fromMuDistance().round(state.floatPrecision)
 
     var (index, exactMatch) = (0, false)
 
@@ -1894,13 +1926,10 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
 
     state.updatePointAccordion()
 
-  proc onInputTChange(ev: Event, n: VNode) = 
+  proc changeTTo(t: float) = 
     if not state.startedRendering or state.trajectory.points.len == 0: return
-    #elif state.followBullet and
 
-    var t = 0.0
-    discard parseFloat($n.value, t)
-    t = t.round(state.floatPrecision)
+    var t = t.round(state.floatPrecision)
 
     var (index, exactMatch) = (0, false)
 
@@ -1993,7 +2022,21 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
         label(class = "form-label", `for` = "point-input-x"): text "Pos X"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-x", 
-          step = cstring state.inputStep, onchange = onInputXChange)
+          step = cstring state.inputStep):
+          proc onchange(ev: Event, n: VNode) = 
+            var x = 0.0
+
+            discard parseFloat($n.value, x)
+            changeXTo(x)
+
+          proc onwheel(e: Event, n: VNode) = 
+            e.preventDefault()
+            var x = 0.0
+            discard parseFloat($n.value, x)
+            if e.toJs.wheelDelta.to(float) > 0: x += 1
+            else: x -= 1
+            changeXTo(x)
+
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
         label(class = "form-label", `for` = "point-input-y"): text "Pos Y"
@@ -2006,7 +2049,20 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
         label(class = "form-label", `for` = "point-input-y"): text "Time"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-t", 
-          step = cstring state.inputStep, onchange = onInputTChange)
+          step = cstring state.inputStep):
+          proc onchange(ev: Event, n: VNode) = 
+            var t = 0.0
+
+            discard parseFloat($n.value, t)
+            changeTTo(t)
+
+          proc onwheel(e: Event, n: VNode) = 
+            e.preventDefault()
+            var t = 0.0
+            discard parseFloat($n.value, t)
+            if e.toJs.wheelDelta.to(float) > 0: t += 0.1
+            else: t -= 0.1
+            changeTTo(t)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
@@ -2099,7 +2155,7 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
             text r"\(v_{y} = v\:-\:a = b\)"
 
 proc addTrajectory(state: var ParabolaState) = 
-  if state.trajectories.len < trajectoryStrokeStyles.len:
+  if state.startedRendering and state.trajectories.len < trajectoryStrokeStyles.len:
     var colIndex = -1
 
     for e, c in trajectoryStrokeStyles:
@@ -2126,7 +2182,7 @@ proc addTrajectory(state: var ParabolaState) =
 proc renderTrajectories(state: var ParabolaState): VNode = 
   proc onRadioChange(e: int): auto = 
     proc() = 
-      if e in state.trajectories:
+      if state.startedRendering and e in state.trajectories:
         state.currentTrajectory = e
 
         state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - state.trajectory.state.angleDeg))
@@ -2137,7 +2193,7 @@ proc renderTrajectories(state: var ParabolaState): VNode =
 
   proc onRemoveClick(e: int): auto = 
     proc() = 
-      if state.trajectories.len > 1 and e in state.trajectories:
+      if state.startedRendering and state.trajectories.len > 1 and e in state.trajectories:
         state.trajectories.delete(e)
         if state.currentTrajectory > state.trajectories.high:
           state.currentTrajectory = state.trajectories.high
@@ -2157,12 +2213,11 @@ proc renderTrajectories(state: var ParabolaState): VNode =
         label(class = "form-label tooltip tooltip-right", `data-tooltip` = "Double-click a trajectory to delete it"):
           text "Trajectories"
 
-      tdiv(class = "col-9", id = "traj-radios"): 
+      tdiv(class = "col-8", id = "traj-radios"): 
         if state.trajectories.len < trajectoryStrokeStyles.len:
           button(class = "btn btn-action btn-sm", style = "margin-right: 0.4rem;".toCss):
             italic(class = "icon icon-plus")
-            proc onclick() = 
-              state.addTrajectory()
+            proc onclick() = state.addTrajectory()
 
         for e, t in state.trajectories:
           let checked = state.currentTrajectory == e
@@ -2172,20 +2227,43 @@ proc renderTrajectories(state: var ParabolaState): VNode =
               onchange = onRadioChange(e), checked = checked)
             italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: {color}")
 
-        #tdiv(class = "popover popover-right"):
-          #  label(class = "form-radio form-inline"):
-          #    input(`type`  = "radio", name = "trajectory",
-          #      onchange = onRadioChange(e), checked = checked)
-          #    italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: {color}")
+      button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
+        #italic(class = "icon icon-menu")
+        span(class = "material-symbols-outlined"): text "settings"
+        proc onclick() = 
+          getElementById("settings-modal").classList.add("active")
 
-          #  tdiv(class = "popover-container"):
-          #    if state.trajectories.len > 1:
-          #      button(class = "btn", onclick = onRemoveClick(e)):
-          #        text "Remove"
+    tdiv(class = "modal", id = "settings-modal"):
+      a(class = "modal-overlay", `aria-label`="Close"):
+        proc onclick() = 
+          getElementById("settings-modal").classList.remove("active")
+
+      tdiv(class = "modal-container"):
+        tdiv(class = "modal-header"):
+          a(class = "btn btn-clear float-right", `aria-label`="Close"):
+            proc onclick() = 
+              getElementById("settings-modal").classList.remove("active")
+
+          tdiv(class = "modal-title h5"): text "Settings"
+
+        tdiv(class = "modal-body"):
+          tdiv(class = "content"):
+            form(class = "form-horizontal"):
+              tdiv(class = "form-group"): 
+                tdiv(class = "col-3 col-sm-12"):
+                  label(class = "form-label", `for` = "settings-ts"): text "Time Scale"
+                tdiv(class = "col-9 col-sm-12"):
+                  input(class = "form-inline slider tooltip", `type` = "range", 
+                    min = "0", max = "100", value = "50", id = "settings-ts") 
+
+        tdiv(class = "modal-footer"):
+          button(class = "btn btn-primary"):
+            text "Apply"
 
 proc renderRightDiv(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "column col-4", style = toCss "overflow: auto; height: 100%; " & 
       "scrollbar-width: thin;"):
+
     state.renderTrajectories()
     #tdiv(class = "accordion"):
     #  input(`type` = "checkbox", name  = "accordion-checkbox", 

@@ -25,7 +25,7 @@ task frontendjs, "Compiles the frontend to JavaScript":
 
 task frontend, "Compiles the frontend to JavaScript and builds the CSS":
   exec "nimble css"
-  exec "nim frontendjs"
+  exec "nimble frontendjs"
 
 import std/strtabs
 import src/config as _
