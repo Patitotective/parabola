@@ -106,8 +106,8 @@ i18nInit Locale, true:
     English = "Trajectory Point"
     Spanish = "Punto de la trayectoria"
   formulas:
-    English = "Formulas"
-    Spanish = "Fórmulas"
+    English = "Equations"
+    Spanish = "Equaciones"
   showVxArrow:
     English = "Show X velocity arrow"
     Spanish = "Mostrar la flecha de velocidad en X"
@@ -120,6 +120,12 @@ i18nInit Locale, true:
   bulletsLimit:
     English = "Bullets limit"
     Spanish = "Límite de balas"
+  showFormulaResults:
+    English = "Show equations' solutions"
+    Spanish = "Mostrar los resultados de las equaciones"
+  hiddenFormula:
+    English = "To show the results, check the settings"
+    Spanish = "Para mostrar los resulados, abre la configuración"
 
   #ihaveCat:
   #  English = "I've many cats."

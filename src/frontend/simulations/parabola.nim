@@ -1,5 +1,5 @@
-import std/[math, jsffi, times, dom, jsconsole, enumerate, with, strformat, 
-  asyncjs, algorithm, strutils, parseutils, sugar]
+import std/[math, jsffi, times, dom, jsconsole, with, strformat, 
+  algorithm, strutils, parseutils, sugar]
 import karax/[karax, karaxdsl, vdom, vstyles]
 
 import matter, utils, mouseconstraint
@@ -83,15 +83,12 @@ type
     draggingPoint*: bool # Is the pinned point being dragged
     followBullet*: bool # Have closestPoint follow the bullet
 
-    bounds*: JsObject
-    boundsScale*: JsObject
-    boundsScaleTarget*: float
-
     onMousedown*, onMouseup*, onMousemove*, 
       onMouseleave*, onWheel*: proc(event: JsObject)
 
     floatPrecision*: range[0..8]
     startedRendering*: bool
+    showFormulaResults*: bool
 
     lang*: Locale
 
@@ -184,6 +181,7 @@ const
   velVectorScale = canonInitialSpeed * 0.0015 # Scale of the velocity arrows
   speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*1.69)
   angleLowerLimit = 0.0 # Lower limit when canon is too close to the floor
+  hiddenFormulaVal = "__"
 
 proc gravities(state: ParabolaState): auto = 
   {state.lang.pluto: 0.7, state.lang.moon: 1.6, state.lang.mercAndMars: 3.7, 
@@ -357,35 +355,41 @@ proc findBy[T](points: openArray[TrajectoryPoint], v: T, by: proc(p: TrajectoryP
       closestDistance = d
       result.index = e
 
-proc toggleFormula(ele: Element, to: bool, trueVal: string, falseVal = "__"): string = 
+proc toggleFormula(id: string, to: bool, trueVal: string, falseVal = hiddenFormulaVal, 
+  hideResult = false): string = 
+  let ele = getElementById(id)
   let inp = ele.firstChild
   let label = ele.children[1]
   let icon = Element label.firstChild
 
   if not to:
     inp.checked = false
-    inp.disabled = true
+    inp.disabled = not hideResult and true
 
-    if label.hasAttribute("data-tooltip"):
+    if not hideResult and label.hasAttribute("data-tooltip"):
       if not label.hasAttribute("old-data-tooltip"):
         label.setAttr("old-data-tooltip", label.getAttribute("data-tooltip"))
 
       if label.hasAttribute("disabled-data-tooltip"):
         label.setAttr("data-tooltip", label.getAttribute("disabled-data-tooltip"))
 
-    icon.classList.remove("icon-arrow-right")
-    icon.classList.add("icon-cross")
+    if not hideResult:
+      #icon.classList.remove("icon-arrow-right")
+      #icon.classList.add("icon-cross")
+      icon.style.setProperty("visibility", "hidden")
 
     falseVal
   else:
     inp.disabled = false
 
-    if label.hasAttribute("data-tooltip"):
+    if not hideResult and label.hasAttribute("data-tooltip"):
       if label.hasAttribute("old-data-tooltip"):
         label.setAttr("data-tooltip", label.getAttribute("old-data-tooltip"))
 
-    icon.classList.remove("icon-cross")
-    icon.classList.add("icon-arrow-right")
+    if not hideResult:
+      #icon.classList.remove("icon-cross")
+      #icon.classList.add("icon-arrow-right")
+      icon.style.setProperty("visibility", "visible")
 
     trueVal
 
@@ -399,7 +403,8 @@ proc updateFormulaAccordion(state: var ParabolaState) =
 
   let changes = {
     "#vix > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.vel.x)}m/s",
+      toggleFormula("vix", state.showFormulaResults, 
+        &"{state.strfloat(siInitialState.vel.x)}m/s", hideResult = true),
     "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.speed)}m/s",
     "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-texatom:nth-child(3) > mjx-mi:nth-child(1)":
@@ -408,7 +413,8 @@ proc updateFormulaAccordion(state: var ParabolaState) =
       &"{state.strfloat(siInitialState.vel.x)}m/s",    
 
     "#viy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.vel.y)}m/s",
+      toggleFormula("viy", state.showFormulaResults, 
+        &"{state.strfloat(siInitialState.vel.y)}m/s", hideResult = true),
     "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.speed)}m/s",
     "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-texatom:nth-child(3) > mjx-mi:nth-child(1)":
@@ -417,8 +423,11 @@ proc updateFormulaAccordion(state: var ParabolaState) =
       &"{state.strfloat(siInitialState.vel.y)}m/s",    
 
     "#maxheight > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      toggleFormula(getElementById("maxheight"), state.trajectory.highestPoint != 0, 
-        &"{state.strfloat(state.trajectory.maxHeight.toMuDistance)}m"),
+      if state.trajectory.highestPoint == 0:
+        toggleFormula("maxheight", false, "")
+      else:
+        toggleFormula("maxheight", state.showFormulaResults,
+          &"{state.strfloat(state.trajectory.maxHeight.toMuDistance)}m", hideResult = true),
     "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
       &"{state.strfloat(siInitialState.height + (vySquared / gTwice))}m",
     "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(3)":
@@ -439,7 +448,8 @@ proc updateFormulaAccordion(state: var ParabolaState) =
       &"{state.strfloat(siInitialState.height)}m",
 
     "#l_f-2 > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(state.trajectory.totalTime)}s",
+      toggleFormula("timeflight", state.showFormulaResults, 
+        &"{state.strfloat(state.trajectory.totalTime)}s", hideResult = true),
     "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-msup:nth-child(1) > mjx-mi:nth-child(1)":
       &"({state.strfloat(siInitialState.vel.y)}m/s)",
     "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
@@ -486,7 +496,9 @@ proc updateFormulaAccordion(state: var ParabolaState) =
       &"{state.strfloat((siInitialState.vel.y + sqrt(vySquared + gTimesHTwice)) / siInitialState.gravity.y)}s",
     
     "#l_f-3 > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m",
+      toggleFormula("maxrangediv", state.showFormulaResults, 
+        &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m", hideResult = true),
+
     "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.x)}m/s",
     "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
@@ -547,7 +559,11 @@ proc updatePointAccordion(state: var ParabolaState) =
 
   let changes = {
     "#x > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      getElementById("x").toggleFormula(show, &"{state.strfloat(point.pos.x)}m"),
+      if not show:
+        toggleFormula("x", false, "")
+      else:
+        toggleFormula("x", state.showFormulaResults, 
+          &"{state.strfloat(point.pos.x)}m", hideResult = true),
     "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(point.time)}s",
     "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
@@ -556,7 +572,11 @@ proc updatePointAccordion(state: var ParabolaState) =
       &"{state.strfloat(point.pos.x)}m",
 
     "#y > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      getElementById("y").toggleFormula(show, &"{state.strfloat(point.pos.y)}m"),
+      if not show:
+        toggleFormula("y", false, "")
+      else:
+        toggleFormula("y", state.showFormulaResults, 
+          &"{state.strfloat(point.pos.y)}m", hideResult = true),
     "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.height)}m",
     "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
@@ -590,10 +610,17 @@ proc updatePointAccordion(state: var ParabolaState) =
       &"{state.strfloat(point.pos.y)}m",
 
     "#vx > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.vel.x)}m/s",
+      if state.showFormulaResults: 
+        &"{state.strfloat(siInitialState.vel.x)}m/s"
+      else:
+        hiddenFormulaVal,
 
     "#vy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      getElementById("vy").toggleFormula(show, &"{state.strfloat(point.vel.y)}m/s"),
+      if not show:
+        toggleFormula("vy", false, "")
+      else:
+        toggleFormula("vy", state.showFormulaResults, 
+          &"{state.strfloat(point.vel.y)}m/s", hideResult = true),
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
     "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
@@ -899,9 +926,7 @@ proc calcClosestTrajectoryPointToBullet(state: var ParabolaState, index = -1) =
 
 proc initParabolaState*(): ParabolaState = 
   result = ParabolaState(
-    boundsScale: JsObject{x: 1, y: 1},
-    boundsScaleTarget: 1, 
-    floatPrecision: 2,
+    floatPrecision: 2, showFormulaResults: true, 
     canon: Canon(bulletRadius: 20, bulletsLimit: 11, showVArrow: true, 
       showVxArrow: true, showVyArrow: true,
       bulletOptions: JsObject{
@@ -991,75 +1016,6 @@ proc onCollisionStart(state: var ParabolaState, event: JsObject) =
 
       for i in countdown(toDelete.high, toDelete.low):
         state.canon.flyingBullets.delete(toDelete[i])
-
-proc onBeforeRender(state: var ParabolaState, event: JsObject) = 
-  return
-  # WIP zoom
-  #let mouse = state.mouse
-  #var scaleFactor = mouse.wheelDelta.to(float) * -0.1
-
-  #if state.boundsScaleTarget + scaleFactor >= 1 and 
-  #  (scaleFactor < 0 and state.boundsScale.x.to(float) >= 0.6 or 
-  #    scaleFactor > 0 and state.boundsScale.x.to(float) <= 1.4):
-  #  state.boundsScaleTarget += scaleFactor
-
-  ## if scale has changed
-  #if abs(state.boundsScale.x.to(float) - state.boundsScaleTarget) > 0.01:
-  #  # smoothly tween scale factor
-  #  scaleFactor = (state.boundsScaleTarget - state.boundsScale.x.to(float)) * 0.2
-  #  state.boundsScale.x += toJs scaleFactor
-  #  state.boundsScale.y += toJs scaleFactor
-
-  #  # scale the render bounds
-  #  state.render.bounds.max.x = state.render.bounds.min.x + state.render.options.width.toJs * state.boundsScale.x
-  #  state.render.bounds.max.y = state.render.bounds.min.y + state.render.options.height.toJs * state.boundsScale.y
-
-  #  # translate so zoom is from centre of view
-  #  let translate = JsObject{
-  #    x: state.render.options.width.to(float) * scaleFactor * -0.5,
-  #    y: state.render.options.height.to(float) * scaleFactor * -0.5
-  #  }
-
-  #  Matter.Bounds.translate(state.render.bounds, translate)
-
-  #  # update mouse
-  #  Matter.Mouse.setScale(mouse, state.boundsScale)
-  #  Matter.Mouse.setOffset(mouse, state.render.bounds.min)
-
-  ## get vector from mouse relative to centre of viewport
-  #var viewportCentre = JsObject{
-  #  x: state.render.options.width * toJs 0.5,
-  #  y: state.render.options.height * toJs 0.5
-  #}
-  #let deltaCentre = Matter.Vector.sub(mouse.absolute, viewportCentre)
-  #let centreDist = Matter.Vector.magnitude(deltaCentre)
-
-  ## translate the view if mouse has moved over 50px from the centre of viewport
-  #if centreDist.to(float) > 50:
-  #  # create a vector to translate the view, allowing the user to control view speed
-  #  let direction = Matter.Vector.normalise(deltaCentre)
-  #  let speed = min(10, pow(centreDist.to(float) - 50, 2) * 0.0002)
-
-  #  let translate = Matter.Vector.mult(direction, speed)
-
-  #  # prevent the view moving outside the extens (bounds)
-  #  if to(state.render.bounds.min.x + translate.x < state.bounds.min.x, bool):
-  #    translate.x = state.bounds.min.x - state.render.bounds.min.x
-
-  #  if to(state.render.bounds.max.x + translate.x > state.bounds.max.x, bool):
-  #    translate.x = state.bounds.max.x - state.render.bounds.max.x
-
-  #  if to(state.render.bounds.min.y + translate.y < state.bounds.min.y, bool):
-  #    translate.y = state.bounds.min.y - state.render.bounds.min.y
-
-  #  if to(state.render.bounds.max.y + translate.y > state.bounds.max.y, bool):
-  #    translate.y = state.bounds.max.y - state.render.bounds.max.y
-
-  #  # move the view
-  #  Matter.Bounds.translate(state.render.bounds, translate)
-
-  #  # we must update the mouse too
-  #  Matter.Mouse.setOffset(mouse, state.render.bounds.min)
 
 proc drawVelocityArrows(state: ParabolaState, ctx: JsObject) = 
   template b(): untyped = 
@@ -1187,7 +1143,7 @@ proc drawHeight(state: ParabolaState, ctx: JsObject) =
 
   ctx.fillText(cstring text, 
     state.canon.pivot.x + xOffset - (width / 2) - twidth - 5,
-    state.canvasSize.y- groundHeight - (state.trajectory.state.height / 2) - (theight / 2))
+    state.canvasSize.y - groundHeight - (state.trajectory.state.height / 2) - (theight / 2))
 
   ctx.shadowOffsetX = 0
   ctx.shadowOffsetY = 0
@@ -1461,8 +1417,8 @@ proc loadEvents(state: var ParabolaState) =
   Matter.Events.on(state.engine, "collisionStart", 
     (event: JsObject) => state.onCollisionStart(event))
 
-  Matter.Events.on(state.render, "beforeRender", 
-    (event: JsObject) => state.onBeforeRender(event))
+  #Matter.Events.on(state.render, "beforeRender", 
+  #  (event: JsObject) => state.onBeforeRender(event))
 
   Matter.Events.on(state.render, "afterRender", 
     (event: JsObject) => state.onAfterRender(event))
@@ -1531,8 +1487,6 @@ proc load*(state: var ParabolaState) =
 
   state.runner = Matter.Runner.create(JsObject{fps: fps})
   Matter.Runner.run(state.runner, state.engine)
-
-  state.bounds = JsObject{min: JsObject{x: 0, y: 0}, max: JsObject{x: state.canvasSize.x * 0.6, y: state.canvasSize.y * 0.5}}
 
   # Create and add all bodies to the world
   # onResize will set the correct positions
@@ -1655,7 +1609,8 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
     tdiv(id = "vix", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f--1", hidden = true, checked = false)
-      label(class = "accordion-header tooltip tooltip-bottom", `for` = "accordion-f--1", `data-tooltip` = state.lang.vix):
+      label(class = "accordion-header tooltip tooltip-bottom", `for` = "accordion-f--1", 
+        `data-tooltip` = cstring state.lang.vix):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(v_{ix} = v\:\cdot\:\cos{\alpha} = d\)"
 
@@ -1667,7 +1622,8 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
     tdiv(id = "viy", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-0", hidden = true, checked = false)
-      label(class = "accordion-header tooltip", `for` = "accordion-f-0", `data-tooltip` = state.lang.viy):
+      label(class = "accordion-header tooltip", `for` = "accordion-f-0", 
+        `data-tooltip` = cstring state.lang.viy):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(v_{iy} = v\:\cdot\:\sin{\alpha} = d\)"
 
@@ -1680,7 +1636,8 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-1", hidden = true, checked = false)
       label(class = "accordion-header tooltip", `for` = "accordion-f-1", 
-        `data-tooltip` = state.lang.maxHeight, `disabled-data-tooltip` = state.lang.disabledMaxHeight):
+        `data-tooltip` = cstring state.lang.maxHeight, 
+        `disabled-data-tooltip` = cstring state.lang.disabledMaxHeight):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g} = d\)"
 
@@ -1693,10 +1650,11 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
           li(id = "mh4", style = liStyle):
             text r"\(h_{max} = h + a = d\)"
 
-    tdiv(class = "accordion"):
+    tdiv(class = "accordion", id = "timeflight"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-2", hidden = true, checked = false)
-      label(id = "l_f-2", class = "accordion-header tooltip", `for` = "accordion-f-2", `data-tooltip` = state.lang.timeOfFlight):
+      label(id = "l_f-2", class = "accordion-header tooltip", `for` = "accordion-f-2", 
+        `data-tooltip` = cstring state.lang.timeOfFlight):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(t_{f} = \dfrac{v_{iy}\:+\:\sqrt{v_{iy}^{2}\:+\:2gh}}{g} = d\)"
 
@@ -1715,10 +1673,11 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
           li(id = "tf6", style = liStyle):
             text r"\(t_{f} = \dfrac{c}{g} = d\)"
 
-    tdiv(class = "accordion"):
+    tdiv(class = "accordion", id = "maxrangediv"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-3", hidden = true, checked = false)
-      label(id = "l_f-3", class = "accordion-header tooltip", `for` = "accordion-f-3", `data-tooltip` = state.lang.maxRange):
+      label(id = "l_f-3", class = "accordion-header tooltip", `for` = "accordion-f-3", 
+        `data-tooltip` = cstring state.lang.maxRange):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(x_{max} = v_{ix}\:\cdot\:t_f = d\)"
 
@@ -1910,7 +1869,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
     # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
 
 proc renderPointAccordion(state: var ParabolaState): VNode =
-  let (show, point) = state.currentPoint()
+  #let (show, point) = state.currentPoint()
 
   let liStyle = "margin-top: 20px;".toCss
   let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
@@ -2140,7 +2099,7 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-x", hidden = true, checked = false)
       label(class = "accordion-header tooltip", `for` = "accordion-f-x", 
-        `data-tooltip` = state.lang.x, `disabled-data-tooltip` = state.lang.noPoint):
+        `data-tooltip` = cstring state.lang.x, `disabled-data-tooltip` = cstring state.lang.noPoint):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(x = t\:\cdot\:v_{ox} = d\)"
 
@@ -2155,7 +2114,7 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-y", hidden = true, checked = false)
       label(class = "accordion-header tooltip", `for` = "accordion-f-y", 
-        `data-tooltip` = state.lang.y, `disabled-data-tooltip` = state.lang.noPoint):
+        `data-tooltip` = cstring state.lang.y, `disabled-data-tooltip` = cstring state.lang.noPoint):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(y = h\:+\:t\:\cdot\:v_{oy}\:+\:\dfrac{g\:\cdot\:t^2}{2} = d\)"
 
@@ -2170,15 +2129,15 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
           li(style = liStyle): 
             text r"\(y = b\:+\:d = e\)"
 
-    label(id = "vx", class = "accordion-header tooltip", `data-tooltip` = state.lang.vx, 
-      style = toCss "margin-bottom: 0.6rem;"):
+    label(id = "vx", class = "accordion-header tooltip", `data-tooltip` = cstring state.lang.vx, 
+      style = toCss "margin-bottom: 0.6rem; margin-left: 1rem;"):
       text r"\(v_{x} = v_{xy} = d\)"
 
     tdiv(id = "vy", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-vy", hidden = true, checked = false)
       label(class = "accordion-header tooltip", `for` = "accordion-f-vy", 
-        `data-tooltip` = state.lang.vy, `disabled-data-tooltip` = state.lang.noPoint):
+        `data-tooltip` = cstring state.lang.vy, `disabled-data-tooltip` = cstring state.lang.noPoint):
         italic(class = "icon icon-arrow-right mr-1")
         text r"\(v_{y} = v_{iy}\:-\:g\:\cdot\:t = d\)"
 
@@ -2242,7 +2201,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
               tdiv(class = "col-9 col-sm-12"):
                 ul(class = "step", id = "timesteps"):
                   for t in timeSteps:
-                    li(class = class({"active": not state.engine.isNil and state.engine.timing.timeScale.to(float) == timeScale * t},
+                    li(class = cstring class({"active": not state.engine.isNil and state.engine.timing.timeScale.to(float) == timeScale * t},
                       "step-item")):
                       a(href = "#", text &"{t}×", onclick = onClickStep(t))
 
@@ -2291,14 +2250,26 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
 
                 italic(class = "form-icon")
                 text state.lang.showVyArrow
-            
+
+            tdiv(class = "form-group"): 
+              label(class = "form-switch"):
+                input(`type` = "checkbox", id = "settings-er", 
+                  checked = true):
+                  proc onchange(ev: Event, n: VNode) = 
+                    state.showFormulaResults = n.dom.checked
+                    state.updateFormulaAccordion()
+                    state.updatePointAccordion()
+
+                italic(class = "form-icon")
+                text state.lang.showFormulaResults
+
             tdiv(class = "form-group"): 
               tdiv(class = "col-3 col-sm-12"):
                 label(class = "form-label", `for` = "settings-bl"):
                   text state.lang.bulletsLimit
-              tdiv(class = "col-9 col-sm-12 tooltip tooltip-left", `data-tooltip` = $state.canon.bulletsLimit):
+              tdiv(class = "col-9 col-sm-12 tooltip tooltip-left", `data-tooltip` = cstring $state.canon.bulletsLimit):
                 input(class = "slider", `type` = "range", id = "settings-bl", 
-                  min = "1", max = "50", value = $state.canon.bulletsLimit, step = "1"):
+                  min = "1", max = "50", value = cstring $state.canon.bulletsLimit, step = "1"):
                   proc onchange(e: Event, n: VNode) = 
                     var v = 0
                     discard parseInt($n.value, v)
@@ -2345,7 +2316,7 @@ proc renderTrajectories(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "form-horizontal", style = "margin: 0rem .2rem -0.3rem 1.3rem;".toCss):
     tdiv(class = "form-group"):
       tdiv(class = "col-3"):
-        label(class = "form-label tooltip tooltip-right", `data-tooltip` = state.lang.trajTooltip):
+        label(class = "form-label tooltip tooltip-right", `data-tooltip` = cstring state.lang.trajTooltip):
           text state.lang.trajecs
 
       tdiv(class = "col-8", id = "traj-radios"): 

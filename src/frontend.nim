@@ -1,10 +1,9 @@
 ## This is the module that manipulates the frontend using karax
 
-import std/[dom, json, asyncjs, jsffi, math, jsconsole, enumerate, sugar, strformat, strutils, tables]
-import karax/[karax, kajax, karaxdsl, vdom, vstyles, jdict, languages]
+import std/[dom, jsffi]
+import karax/[karax, vdom]
 
 # import matter
-import frontend/[routes, utils, patterns]
 import frontend/simulations/[parabola, utils]
 
 type
@@ -33,12 +32,12 @@ proc newState(): State =
   )
   result.parabola.addEventListeners()
 
-proc navigateTo(uri: cstring) =
-  # Add uri to the history
-  window.history.pushState(0, cstring"", uri)
+#proc navigateTo(uri: cstring) =
+#  # Add uri to the history
+#  window.history.pushState(0, cstring"", uri)
 
-  # Fire the popState event.
-  dom.window.dispatchEvent(dom.newEvent("popstate"))
+#  # Fire the popState event.
+#  dom.window.dispatchEvent(dom.newEvent("popstate"))
 
 var state = newState()
 
