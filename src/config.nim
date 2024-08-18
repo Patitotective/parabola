@@ -3,7 +3,7 @@ import kdl, kdl/[decoder]
 
 type
   Config* = object
-    title*: string
+    title*, version*, website*: string
     appPath*: string # Path where the app is: https://www.example.com/ or https://www.example.com/app
     port*: int
     hostname*: string

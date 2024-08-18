@@ -98,7 +98,7 @@ i18nInit Locale, true:
     Spanish = "Trayectorias"
   trajTooltip:
     English = "Double-click a trajectory to delete it"
-    Spanish = "Da doble click sobre una trajectoria para eliminarla"
+    Spanish = "Da doble click sobre una trajectoria\npara eliminarla"
   iniState:
     English = "Initial State"
     Spanish = "Estado Inicial"
@@ -123,9 +123,15 @@ i18nInit Locale, true:
   showFormulaResults:
     English = "Show equations' solutions"
     Spanish = "Mostrar los resultados de las equaciones"
-  hiddenFormula:
-    English = "To show the results, check the settings"
-    Spanish = "Para mostrar los resulados, abre la configuración"
+  #hiddenFormula:
+  #  English = "To show the results, check the settings"
+  #  Spanish = "Para mostrar los resulados, \nabre la configuración"
+  starsAnimation:
+    English = "Animate background stars"
+    Spanish = "Animar las estrellas de fondo"
+  aboutMsg:
+    English = "Made by Patitotective. Source code in "
+    Spanish = "Hecho por Patitotective. Código fuente en "
 
   #ihaveCat:
   #  English = "I've many cats."

@@ -4,6 +4,7 @@ import karax/[karax, karaxdsl, vdom, vstyles]
 
 import matter, utils, mouseconstraint
 import ../../translations
+import ../../config as _
 
 type
   CanonState = object
@@ -270,6 +271,7 @@ proc freeze(state: var ParabolaState) =
   # thought the render might stop and leave the canvas blank so we run it once
   # here to be sure there's something on the canvas
   state.render.runOnce()
+
   state.frozen = true
 
 proc unfreeze(state: var ParabolaState) = 
@@ -382,14 +384,13 @@ proc toggleFormula(id: string, to: bool, trueVal: string, falseVal = hiddenFormu
   else:
     inp.disabled = false
 
-    if not hideResult and label.hasAttribute("data-tooltip"):
+    if label.hasAttribute("data-tooltip"):
       if label.hasAttribute("old-data-tooltip"):
         label.setAttr("data-tooltip", label.getAttribute("old-data-tooltip"))
 
-    if not hideResult:
-      #icon.classList.remove("icon-cross")
-      #icon.classList.add("icon-arrow-right")
-      icon.style.setProperty("visibility", "visible")
+    #icon.classList.remove("icon-cross")
+    #icon.classList.add("icon-arrow-right")
+    icon.style.setProperty("visibility", "visible")
 
     trueVal
 
@@ -788,8 +789,8 @@ proc fireBullet(state: var ParabolaState) =
     if state.canon.bullets[b].getPos() == bullet.getPos():
       return
 
-  # If the limit is exceed by the triple, remove half of the bullets
-  if state.canon.bullets.len + 1 > state.canon.bulletsLimit * 3:
+  # If the limit is exceed by 10, remove half of the bullets
+  if state.canon.bullets.len + 1 > state.canon.bulletsLimit + 10:
     var toDelete: seq[int]
     for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit):
       Matter.Composite.remove(state.engine.world, state.canon.bullets[i])
@@ -927,13 +928,13 @@ proc calcClosestTrajectoryPointToBullet(state: var ParabolaState, index = -1) =
 proc initParabolaState*(): ParabolaState = 
   result = ParabolaState(
     floatPrecision: 2, showFormulaResults: true, 
-    canon: Canon(bulletRadius: 20, bulletsLimit: 11, showVArrow: true, 
+    canon: Canon(bulletRadius: 20, bulletsLimit: 7, showVArrow: true, 
       showVxArrow: true, showVyArrow: true,
       bulletOptions: JsObject{
         zIndex: 0, isStatic: false, frictionAir: 0, friction: 1, frictionStatic: 1, 
         collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: cstring"bullet",
       }),
-    trajectories: @[initTrajectory()], lang: English
+    trajectories: @[initTrajectory()], lang: Spanish
   )
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
@@ -1036,7 +1037,7 @@ proc drawVelocityArrows(state: ParabolaState, ctx: JsObject) =
       drawArrow(ctx, b.position.x, b.position.y, 
         b.position.x + (b.velocity.x * toJs velVectorScale), 
         b.position.y,
-        toJs arrowWidth, toJs cstring"#3FD0F6" # Neon blue
+        toJs arrowWidth, toJs cstring"DodgerBlue" # Neon blue
       )
 
     if state.canon.showVArrow and (b.velocity.x.to(float) notin -threshold..threshold or 
@@ -1453,9 +1454,15 @@ proc onImagesLoaded(state: var ParabolaState) =
 #    # Matter.Render all MathJax expressions synchronously
 #    (resolve)
 
+proc toggleStarsAnimation(to: bool) = 
+  for e in document.querySelectorAll(".stars"):
+    e.style.animationPlayState = cstring(
+      if to: "running" else: "paused")
+
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
   getElementById("langSelect").value = cstring $state.lang.int
+  toggleStarsAnimation(false)
 
   # Load wrap's plugin and load matter aliases to point to the correct values
   Matter.use("matter-wrap")
@@ -1518,7 +1525,8 @@ proc load*(state: var ParabolaState) =
 
   state.ground = Matter.Bodies.rectangle(0, 0, state.canvasSize.x * 1000, groundHeight * 2, 
     JsObject{zIndex: -1, friction: 1, frictionStatic: 1, isStatic: true, 
-      label: cstring"Ground", collisionFilter: JsObject{category: 2, mask: 3}
+      label: cstring"Ground", collisionFilter: JsObject{category: 2, mask: 3}, 
+      render: JsObject{fillStyle: cstring""}
     }
   ) # 350, 495, 1200
   state.ground.xratio = 0.5
@@ -1591,15 +1599,22 @@ proc reload*(state: var ParabolaState) =
 
 proc renderLeftDiv(state: var ParabolaState): VNode =
   buildHtml tdiv(id = "sim", class = "column col-8", style = "height: 100%".toCss):
-    # tabindex makes it able to focus the canvas
-    canvas(id = "canvas", style = toCss "height: 100%; width: 100%; min-width: 500px;" & 
-      "min-height: 300px; background: rgb(20, 21, 31); outline: none", tabindex = "0"):
+    # tabindex makes it able to focus the canvas 
+    canvas(id = "canvas", style = toCss "height: 100%; width: 100%; min-width: 500px;" &
+      "min-height: 300px; outline: none", tabindex = "0"):
       text "Matter-js simulation"
       proc onclick(e: Event, n: VNode) = 
         n.dom.focus()
       # Doing this because I saw it on matter-js's Matter.Render._createCanvas
       proc oncontextmenu(ev: Event, _: VNode) = ev.preventDefault()
       proc ondragstart(ev: Event, _: VNode) = ev.preventDefault()
+
+    # class is col-8 to be the same size as #div
+    tdiv(class = "col-8", style = toCss "background: radial-gradient(ellipse at bottom, rgb(23, 34, 68) 0%, rgb(19, 9, 53) 100%);" & 
+      "position: absolute; top: 0; left: 0; height: 100%; z-index: -10;"):
+      tdiv(id = "stars", class = "stars")
+      tdiv(id = "stars2", class = "stars")
+      tdiv(id = "stars3", class = "stars")
 
 proc renderFormulasAccordion(state: var ParabolaState): VNode =
   let liStyle = "margin-top: 20px;".toCss
@@ -1760,7 +1775,12 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
             var a = 0
 
             discard parseInt($n.value, a)
-            a = a.clamp(0..360)
+
+            if a < 0:
+              a = clamp(360 + a, 0..359)
+            elif a > 359:
+              a = clamp(a - 360, 0..359)
+
             state.rotateCanon(degToRad(
               state.canon.normalizedAngleDeg() - a.float
             ))
@@ -2264,6 +2284,16 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                 text state.lang.showFormulaResults
 
             tdiv(class = "form-group"): 
+              label(class = "form-switch"):
+                input(`type` = "checkbox", id = "settings-sa", 
+                  checked = false):
+                  proc onchange(ev: Event, n: VNode) = 
+                    toggleStarsAnimation(n.dom.checked)
+
+                italic(class = "form-icon")
+                text state.lang.starsAnimation
+
+            tdiv(class = "form-group"): 
               tdiv(class = "col-3 col-sm-12"):
                 label(class = "form-label", `for` = "settings-bl"):
                   text state.lang.bulletsLimit
@@ -2280,10 +2310,9 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                     n.dom.parentElement.setAttr("data-tooltip", n.value)
 
       tdiv(class = "modal-footer"):
-        discard
-        #button(class = "btn btn-primary"):
-        #  text "Apply"
-
+        text state.lang.aboutMsg(config.version)
+        a(href = cstring config.website): text "GitHub"
+        text "."
 
 proc renderTrajectories(state: var ParabolaState): VNode = 
   proc onRadioChange(e: int): auto = 
@@ -2304,9 +2333,11 @@ proc renderTrajectories(state: var ParabolaState): VNode =
         if state.currentTrajectory > state.trajectories.high:
           state.currentTrajectory = state.trajectories.high
 
-          state.moveCanonTo(state.canvasSize.y - 
-            groundHeight.float - state.trajectory.state.height + state.canonYDiff)
-          state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - state.trajectory.state.angleDeg))
+        state.moveCanonTo(state.canvasSize.y - 
+          groundHeight.float - state.trajectory.state.height + state.canonYDiff)
+        state.rotateCanon(degToRad(state.canon.normalizedAngleDeg() - state.trajectory.state.angleDeg))
+        state.engine.gravity.y = state.trajectory.state.gravity.y
+        state.calcTrajectory()
 
         if state.frozen:
           state.unfreeze()

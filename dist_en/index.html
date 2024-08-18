@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Parabola</title>
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="./img/favicon.ico">
+
+  <!-- Bootstrap and FontAwesome -->
+  <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous"> -->
+  <!-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" /> -->
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,1,0" />
+  
+  <!-- My Custom Css -->
+  <link rel="stylesheet" type="text/css" href="./style.css">
+  <!-- <link rel="stylesheet" type="text/css" href="/public/css/spectre/dist/spectre.min.css"> -->
+  <!-- <link rel="stylesheet" type="text/css" href="/public/css/spectre/dist/spectre-icons.min.css"> -->
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=$ ga"></script> -->
+  <!-- <script> -->
+  <!--   window.dataLayer = window.dataLayer || []; -->
+    <!-- function gtag(){dataLayer.push(arguments);} -->
+    <!-- gtag('js', new Date()); -->
+
+    <!-- gtag('config', '$ ga'); -->
+  <!-- </script> -->
+
+</head>
+
+<body>
+  <div id="ROOT"></div>
+  <!-- Bootstrap -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script> -->
+
+  <!-- Matter.js -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js" integrity="sha512-0z8URjGET6GWnS1xcgiLBZBzoaS8BNlKayfZyQNKz4IRp+s7CKXx0yz7Eco2+TcwoeMBa5KMwmTX7Kus7Fa5Uw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+  <!-- Matter.js wrap plugin -->
+  <script defer src="https://cdn.jsdelivr.net/npm/matter-wrap@0.2.0/build/matter-wrap.min.js" integrity="sha256-5Joj4yN1bnDB2NEyA2XIM5FanLSGfd2q6Jvpdh399gs=" crossorigin="anonymous"></script>
+
+  <!-- Pollyfill -->
+  <!-- <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script> -->
+
+  <!-- Mathjax -->
+  <script>
+    MathJax = {
+      loader: {load: ['a11y/explorer']}, 
+      startup: {
+        typeset: false,
+        // ready: () => {
+          // MathJax.startup.defaultReady();
+        // },
+      },
+      options: {
+        // enableEnrichment: true,
+        // enableExplorer: false,                // set to false to disable the explorer
+        // enableComplexity: false,       // set to false to disable complexity computations
+        enableMenu: true,          // set to false to disable the menu
+        menuOptions: {
+          settings: {
+            zoom: 'DoubleClick',        // or 'Click' or 'DoubleClick' as zoom trigger
+            zscale: '200%',        // zoom scaling factor
+            // assistiveMml: false,    // true if hidden assistive MathML should be generated for screen readers
+            // collapsible: false,    // true if complex math should be collapsible
+            // explorer: false,       // true if the expression explorer should be active
+            // texHints: false,        // put TeX-related attributes on MathML
+            // semantics: false,      // put original format in <semantic> tag in MathM
+          },
+        }
+      }
+    }
+  </script>
+
+  <script defer id="MathJax-script" src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js"></script>
+  
+  <!-- Frontend   -->
+  <script defer src="./app.js"></script> <!-- ?t=$ timestamp -->
+</body> 
+</html>
+

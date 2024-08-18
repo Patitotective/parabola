@@ -8,26 +8,26 @@ import frontend/simulations/[parabola, utils]
 
 type
   State = ref object
-    prevTitle*: cstring # Title of the previous page when using navigateTo()
-    location*: Location
+    #prevTitle*: cstring # Title of the previous page when using navigateTo()
+    #location*: Location
     matterLoaded*: bool
     parabola*: ParabolaState
 
-proc deepCopy(l: Location): Location =
-  Location(
-    hash: l.hash,
-    host: l.host,
-    hostname: l.hostname,
-    href: l.href,
-    pathname: l.pathname,
-    port: l.port,
-    protocol: l.protocol,
-    search: l.search,
-    origin: l.origin,
-  )
+#proc deepCopy(l: Location): Location =
+#  Location(
+#    hash: l.hash,
+#    host: l.host,
+#    hostname: l.hostname,
+#    href: l.href,
+#    pathname: l.pathname,
+#    port: l.port,
+#    protocol: l.protocol,
+#    search: l.search,
+#    origin: l.origin,
+#  )
 
 proc newState(): State =
-  result = State(location: window.location.deepCopy(), prevTitle: document.title, 
+  result = State(#location: window.location.deepCopy(), prevTitle: document.title, 
     parabola: initParabolaState()
   )
   result.parabola.addEventListeners()
@@ -59,14 +59,14 @@ proc postRender() =
 # This event is (usually only) called when the user moves back in history
 # Here we fake the moving-back-in-history action so it doesn't actually reload the page
 # Instead, it just refreshes the state and asks karax to redraw the page
-window.onPopState = proc(event: Event) =
-  document.title = state.prevTitle
-  if state.location.href != window.location.href:
-    state = newState() # Reload the state to remove stale data.
-  else:
-    state.location = window.location.deepCopy()
+#window.onPopState = proc(event: Event) =
+#  document.title = state.prevTitle
+#  if state.location.href != window.location.href:
+#    state = newState() # Reload the state to remove stale data.
+#  else:
+#    state.location = window.location.deepCopy()
 
-  redraw()
+#  redraw()
 
 setRenderer render, clientPostRenderCallback = postRender
 

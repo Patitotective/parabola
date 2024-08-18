@@ -1,8 +1,11 @@
+import std/strtabs
+import src/config as _
+
 # Package
 
-version       = "0.1.0"
+version       = config.version
 author        = "Patitotective"
-description   = "A new awesome nimble package"
+description   = "A projectile motion simulator website (only html)"
 license       = "MIT"
 srcDir        = "src"
 skipExt       = @["nim"]
@@ -21,15 +24,12 @@ requires "ni18n == 0.1.0"
 task css, "Builds the CSS":
   exec "nimble c -r --mm:refc src/buildcss"
 
-task frontendjs, "Compiles the frontend to JavaScript":
-  exec "nim js --outdir:public/js src/frontend"
+#task frontendjs, "Compiles the frontend to JavaScript":
+#  exec "nim js --outdir:public/js src/frontend"
 
-task frontend, "Compiles the frontend to JavaScript and builds the CSS":
-  exec "nimble css"
-  exec "nimble frontendjs"
-
-import std/strtabs
-import src/config as _
+#task frontend, "Compiles the frontend to JavaScript and builds the CSS":
+#  exec "nimble css"
+#  exec "nimble frontendjs"
 
 task htmljs, "Generates single html page's JavaScript":
   exec "nim js -d:relativePath --out:dist/app.js src/frontend"
