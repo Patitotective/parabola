@@ -41,13 +41,41 @@ task htmlpage, "Generates a single html page":
   mkDir "dist"
   cpFile "public/css/style.css", "dist/style.css"
   cpDir "public/img", "dist/img"
+  cpDir "public/js", "dist/js"
+  rmFile "dist/js/frontend.js"
 
   writeFile "dist/index.html", readFile("public/karax.html") %
     {
       "title": config.title,
       "frontend": "./app.js",
       "style": "./style.css",
-      "favicon": "./img/favicon.ico"
+      "favicon": "./img/favicon.ico",
+      "mathjax": "./js/mathjax/tex-chtml.js",
+      "matterwrap": "./js/matter-wrap/matter-wrap.min.js",
+      "matterjs": "./js/matter-js/matter.min.js",
+      # "timestamp": encodeUrl(CompileDate & CompileTime),
+      # "ga": config.ga
+    }.newStringTable()
+
+task rhtmlpage, "Generates a single html page":
+  exec "nimble c -r -d:release --mm:refc src/buildcss"
+  exec "nim js -d:relativePath -d:release --out:dist/app.js src/frontend"
+
+  mkDir "dist"
+  cpFile "public/css/style.css", "dist/style.css"
+  cpDir "public/img", "dist/img"
+  cpDir "public/js", "dist/js"
+  rmFile "dist/js/frontend.js"
+
+  writeFile "dist/index.html", readFile("public/karax.html") %
+    {
+      "title": config.title,
+      "frontend": "./app.js",
+      "style": "./style.css",
+      "favicon": "./img/favicon.ico",
+      "mathjax": "./js/mathjax/tex-chtml.js",
+      "matterwrap": "./js/matter-wrap/matter-wrap.min.js",
+      "matterjs": "./js/matter-js/matter.min.js",
       # "timestamp": encodeUrl(CompileDate & CompileTime),
       # "ga": config.ga
     }.newStringTable()

@@ -1,7 +1,6 @@
 [submodule "public/css/spectre"]
 	path = public/css/spectre
 	url = https://github.com/picturepan2/spectre
-
 [submodule "public/js/mathjax"]
 	path = public/js/mathjax
 	url = https://github.com/mathjax/MathJax
