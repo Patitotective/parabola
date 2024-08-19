@@ -365,20 +365,20 @@ proc toggleFormula(id: string, to: bool, trueVal: string, falseVal = hiddenFormu
   let icon = Element label.firstChild
 
   if not to:
-    inp.checked = false
     inp.disabled = not hideResult and true
-
-    if not hideResult and label.hasAttribute("data-tooltip"):
-      if not label.hasAttribute("old-data-tooltip"):
-        label.setAttr("old-data-tooltip", label.getAttribute("data-tooltip"))
-
-      if label.hasAttribute("disabled-data-tooltip"):
-        label.setAttr("data-tooltip", label.getAttribute("disabled-data-tooltip"))
 
     if not hideResult:
       #icon.classList.remove("icon-arrow-right")
       #icon.classList.add("icon-cross")
+      inp.checked = false
       icon.style.setProperty("visibility", "hidden")
+
+      if label.hasAttribute("data-tooltip"):
+        if not label.hasAttribute("old-data-tooltip"):
+          label.setAttr("old-data-tooltip", label.getAttribute("data-tooltip"))
+
+        if label.hasAttribute("disabled-data-tooltip"):
+          label.setAttr("data-tooltip", label.getAttribute("disabled-data-tooltip"))
 
     falseVal
   else:
@@ -665,9 +665,11 @@ proc calcTrajectory(state: var ParabolaState) =
   let downwards = initialState.angleDeg > 180 and initialState.angleDeg < 360
 
   # Was the pinned point the highest or the last point?
-  let prevHighestPoint = state.trajectory.pinnedPoint in state.trajectory.points and 
+  let prevHighestPoint = state.trajectory.pinnedPoint != 0 and 
+    state.trajectory.pinnedPoint in state.trajectory.points and 
     state.trajectory.highestPoint == state.trajectory.pinnedPoint
-  let prevLastPoint = state.trajectory.pinnedPoint in state.trajectory.points and 
+  let prevLastPoint = state.trajectory.pinnedPoint != 0 and 
+    state.trajectory.pinnedPoint in state.trajectory.points and 
     state.trajectory.points.high == state.trajectory.pinnedPoint
 
   var highest = (index: 0, y: 0.0)
@@ -1167,7 +1169,7 @@ proc drawHeight(state: ParabolaState, ctx: JsObject) =
 proc drawRange(state: ParabolaState, ctx: JsObject) = 
   const
     height = 10
-    yOffset = groundHeight - 35
+    yOffset = groundHeight - 30
 
   let text = &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m"
 
@@ -1641,7 +1643,7 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
-          li(id = "mh1"): # font-size: 1.2em;
+          li(id = "mh1"): 
             text r"\(h_{max} = h + \dfrac{(v)^{2}}{2\:\cdot\:10.1}\)"
           li(id = "mh2", style = liStyle):
             text r"\(h_{max} = h + \dfrac{v}{g}\)"
@@ -1658,7 +1660,7 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
-          li(id = "tf1"): # font-size: 1.2em;
+          li(id = "tf1"): 
             text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v^{2}\:+\:2\:\cdot\:g\:\cdot\:h}}{g}\)"
           li(id = "tf2", style = liStyle):
             text r"\(t_{f} = \dfrac{v\:+\:\sqrt{v\:+\:2\:\cdot\:a}}{g}\)"
@@ -1804,22 +1806,6 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
         input(class = "form-input form-inline", `type` = "number", id = "state-input-vy", 
           readonly = true)
 
-    #tdiv(class = "form-group"): 
-    #  tdiv(class = "accordion"):
-    #    input(`type` = "checkbox", name  = "accordion-checkbox", 
-    #      id = "accordion-g", hidden = true, checked = false)
-    #    label(class = "accordion-header", `for` = "accordion-g"):
-    #      italic(class = "icon icon-arrow-right mr-1")
-      
-    #    tdiv(class = "col-3 col-sm-12"):
-    #      label(class = "form-label", `for` = "state-input-g"): text "Gravity"
-    #    tdiv(class = "col-9 col-sm-12"):
-    #      input(class = "form-input form-inline", `type` = "number", id = "state-input-g", 
-    #        step = state.inputStep, onchange = onInputGChange)
-
-    #    tdiv(class = "accordion-body"):
-    #      text "asdasd"
-        
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-g", hidden = true, checked = false, 
@@ -2279,6 +2265,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                     state.showFormulaResults = n.dom.checked
                     state.updateFormulaAccordion()
                     state.updatePointAccordion()
+                    state.updateStateAccordion()
 
                 italic(class = "form-icon")
                 text state.lang.showFormulaResults
@@ -2344,15 +2331,15 @@ proc renderTrajectories(state: var ParabolaState): VNode =
 
         if not kxi.surpressRedraws: redraw(kxi)
 
-  buildHtml tdiv(class = "form-horizontal", style = "margin: 0rem .2rem -0.3rem 1.3rem;".toCss):
+  buildHtml tdiv(class = "form-horizontal", style = "margin: 0rem 0rem -0.3rem 1.3rem;".toCss):
     tdiv(class = "form-group"):
       tdiv(class = "col-3"):
         label(class = "form-label tooltip tooltip-right", `data-tooltip` = cstring state.lang.trajTooltip):
           text state.lang.trajecs
 
-      tdiv(class = "col-8", id = "traj-radios"): 
+      tdiv(class = "col-7", id = "traj-radios"): 
         if state.trajectories.len < trajectoryStrokeStyles.len:
-          button(class = "btn btn-action btn-sm", style = "margin-right: 0.4rem;".toCss):
+          button(class = "btn btn-action btn-sm", style = "margin-right: 0.5rem;".toCss):
             italic(class = "icon icon-plus")
             proc onclick() = state.addTrajectory()
 
@@ -2364,11 +2351,17 @@ proc renderTrajectories(state: var ParabolaState): VNode =
               onchange = onRadioChange(e), checked = checked)
             italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: {color}")
 
-      button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
-        #italic(class = "icon icon-menu")
-        span(class = "material-symbols-outlined"): text "settings"
-        proc onclick() = 
-          getElementById("settings-modal").classList.add("active")
+      tdiv(class = "col-2", style = toCss "padding-right: 0.2rem; display: flex; justify-content: flex-end;"):
+        button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
+          span(class = "material-symbols-outlined"): text "help"
+          proc onclick() = 
+            discard
+            #getElementById("settings-modal").classList.add("active")
+
+        button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
+          span(class = "material-symbols-outlined"): text "settings"
+          proc onclick() = 
+            getElementById("settings-modal").classList.add("active")
 
     state.renderSettingsModal()
 
@@ -2377,14 +2370,6 @@ proc renderRightDiv(state: var ParabolaState): VNode =
       "scrollbar-width: thin;"):
 
     state.renderTrajectories()
-    #tdiv(class = "accordion"):
-    #  input(`type` = "checkbox", name  = "accordion-checkbox", 
-    #    id = "accordion-traj", hidden = true, checked = false)
-    #  label(class = "accordion-header", `for` = "accordion-traj"):
-    #    italic(class = "icon icon-arrow-right mr-1")
-    #    text "Trajectories"
-    #  tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
-    #    state.renderTrajectoriesAccordion()
 
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 

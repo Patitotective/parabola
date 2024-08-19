@@ -116,7 +116,7 @@ i18nInit Locale, true:
     Spanish = "Mostrar la flecha de velocidad en Y"
   showVArrow:
     English = "Show combined velocity arrow"
-    Spanish = "Mostrar la flecha combinada de velocidad"
+    Spanish = "Mostrar la flecha de velocidad combinada"
   bulletsLimit:
     English = "Bullets limit"
     Spanish = "Límite de balas"
