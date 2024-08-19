@@ -52,34 +52,31 @@
   <!-- Mathjax -->
   <script>
     MathJax = {
-      loader: {load: ['a11y/explorer']}, 
+      loader: {load: ['input/tex', 'output/chtml']}, 
       startup: {
         typeset: false,
-        // ready: () => {
-          // MathJax.startup.defaultReady();
-        // },
       },
       options: {
-        // enableEnrichment: true,
-        // enableExplorer: false,                // set to false to disable the explorer
-        // enableComplexity: false,       // set to false to disable complexity computations
-        enableMenu: true,          // set to false to disable the menu
+        enableExplorer: false,                // set to false to disable the explorer
+        enableEnrichment: false,
+        enableComplexity: false,       // set to false to disable complexity computations
+        enableMenu: false,          // set to false to disable the menu
         menuOptions: {
           settings: {
             zoom: 'DoubleClick',        // or 'Click' or 'DoubleClick' as zoom trigger
             zscale: '200%',        // zoom scaling factor
-            // assistiveMml: false,    // true if hidden assistive MathML should be generated for screen readers
-            // collapsible: false,    // true if complex math should be collapsible
-            // explorer: false,       // true if the expression explorer should be active
-            // texHints: false,        // put TeX-related attributes on MathML
-            // semantics: false,      // put original format in <semantic> tag in MathM
+            assistiveMml: false,    // true if hidden assistive MathML should be generated for screen readers
+            collapsible: false,    // true if complex math should be collapsible
+            explorer: false,       // true if the expression explorer should be active
+            texHints: false,        // put TeX-related attributes on MathML
+            semantics: false,      // put original format in <semantic> tag in MathM
           },
         }
-      }
+      },
     }
   </script>
 
-  <script defer id="MathJax-script" src="$mathjax"></script>
+  <script id="MathJax-script" src="$mathjax"></script>
   
   <!-- Frontend   -->
   <script defer src="$frontend"></script> <!-- ?t=$ timestamp -->

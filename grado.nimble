@@ -24,22 +24,36 @@ requires "ni18n == 0.1.0"
 task css, "Builds the CSS":
   exec "nimble c -r --mm:refc src/buildcss"
 
-#task frontendjs, "Compiles the frontend to JavaScript":
-#  exec "nim js --outdir:public/js src/frontend"
+task frontendjs, "Compiles the frontend to JavaScript":
+  exec "nim js --outdir:public/js src/frontend"
 
-#task frontend, "Compiles the frontend to JavaScript and builds the CSS":
-#  exec "nimble css"
-#  exec "nimble frontendjs"
+task frontend, "Compiles the frontend to JavaScript and builds the CSS":
+  exec "nimble css"
+  exec "nimble frontendjs"
 
 task htmljs, "Generates single html page's JavaScript":
   exec "nim js -d:relativePath --out:dist/app.js src/frontend"
 
-proc copyDist() = 
+task makedist, "Creates the dist directory":
   mkDir "dist"
+
   cpFile "public/css/style.css", "dist/style.css"
   cpDir "public/img", "dist/img"
-  cpDir "public/js", "dist/js"
-  rmFile "dist/js/frontend.js"
+
+  cpDir "public/js/matter-wrap", "dist/matter-wrap"
+  cpDir "public/js/matter-js", "dist/matter-js"
+  
+  mkDir "dist/mathjax/input"
+  #mkDir "dist/mathjax/a11y"
+
+  #cpFile "public/js/mathjax/a11y/explorer.js", "dist/mathjax/a11y/explorer.js"
+  #cpFile "public/js/mathjax/a11y/semantic-enrich.js", "dist/mathjax/a11y/semantic-enrich.js"
+  #cpFile "public/js/mathjax/a11y/sre.js", "dist/mathjax/a11y/sre.js"
+  #cpFile "public/js/mathjax/a11y/complexity.js", "dist/mathjax/a11y/complexity.js"
+  #cpFile "public/js/mathjax/a11y/assistive-mml.js", "dist/mathjax/a11y/assistive-mml.js"
+
+  cpFile "public/js/mathjax/input/mml.js", "dist/mathjax/input/mml.js"
+  cpFile "public/js/mathjax/tex-chtml.js", "dist/mathjax/tex-chtml.js"
 
   writeFile "dist/index.html", readFile("public/karax.html") %
     {
@@ -47,20 +61,20 @@ proc copyDist() =
       "frontend": "./app.js",
       "style": "./style.css",
       "favicon": "./img/favicon.ico",
-      "mathjax": "./js/mathjax/es5/tex-chtml.js",
-      "matterwrap": "./js/matter-wrap/matter-wrap.min.js",
-      "matterjs": "./js/matter-js/matter.min.js",
+      "mathjax": "./mathjax/tex-chtml.js",
+      "matterwrap": "./matter-wrap/matter-wrap.min.js",
+      "matterjs": "./matter-js/matter.min.js",
       # "timestamp": encodeUrl(CompileDate & CompileTime),
       # "ga": config.ga
     }.newStringTable()
 
 task htmlpage, "Generates a single html page":
-  exec "nimble css"
-  exec "nimble htmljs"
-  copyDist()
+  cssTask()
+  htmljsTask()
+  makedistTask()
 
 task rhtmlpage, "Generates a single html page":
   exec "nimble c -r -d:release --mm:refc src/buildcss"
   exec "nim js -d:relativePath -d:release --out:dist/app.js src/frontend"
 
-  copyDist()
+  makedistTask()

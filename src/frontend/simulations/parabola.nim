@@ -203,7 +203,7 @@ proc initCanonState(angle: float, deg = false, speed: float,
   result.setSpeed(speed)
 
 proc initTrajectory(): Trajectory = 
-  Trajectory(closestPoint: -1, highestPoint: -1, pinnedPoint: -1, extraPoint: -1, 
+  Trajectory(closestPoint: -1, highestPoint: -1, pinnedPoint: 0, extraPoint: -1, 
     state: initCanonState(0, deg = true, 
       canonInitialSpeed, gravity = vec(0, (9.807 * muMeterFactor) / 
         gravityFactor))
@@ -559,20 +559,20 @@ proc updatePointAccordion(state: var ParabolaState) =
   siInitialState.gravity = siInitialState.gravity * gravityFactor
 
   let changes = {
-    "#x > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#x > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
       if not show:
         toggleFormula("x", false, "")
       else:
         toggleFormula("x", state.showFormulaResults, 
           &"{state.strfloat(point.pos.x)}m", hideResult = true),
-    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(4) > mjx-mi:nth-child(1)":
       &"{state.strfloat(point.time)}s",
-    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(4) > mjx-mi:nth-child(6)":
       &"{state.strfloat(siInitialState.vel.x)}m/s",
-    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
       &"{state.strfloat(point.pos.x)}m",
 
-    "#y > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#y > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
       if not show:
         toggleFormula("y", false, "")
       else:
@@ -610,13 +610,13 @@ proc updatePointAccordion(state: var ParabolaState) =
     "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
       &"{state.strfloat(point.pos.y)}m",
 
-    "#vx > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#vx > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
       if state.showFormulaResults: 
         &"{state.strfloat(siInitialState.vel.x)}m/s"
       else:
         hiddenFormulaVal,
 
-    "#vy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#vy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
       if not show:
         toggleFormula("vy", false, "")
       else:
@@ -638,6 +638,7 @@ proc updatePointAccordion(state: var ParabolaState) =
   }
 
   for (query, value) in changes:
+    echo query
     document.querySelector(cstring query).innerText = cstring value
 
   if state.frozen:

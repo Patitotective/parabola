@@ -11,7 +11,10 @@ proc getKarax(ctx: Context) {.async.} =
       "title": config.title,
       "frontend": "/public/js/frontend.js",
       "style": "/public/css/style.css",
-      "favicon": "/public/img/favicon.ico"
+      "favicon": "/public/img/favicon.ico",
+      "mathjax": "/public/js/mathjax/startup.js",
+      "matterwrap": "/public/js/matter-wrap/matter-wrap.min.js",
+      "matterjs": "/public/js/matter-js/matter.min.js",
       # "timestamp": encodeUrl(CompileDate & CompileTime),
       # "ga": config.ga
     }.newStringTable()
@@ -20,6 +23,6 @@ var app = newApp(
   settings = newSettings(port = Port config.port, appName = config.title, debug = true),
   middlewares = @[staticFileMiddleware("public")]#, debugRequestMiddleware(), debugResponseMiddleware()],
 )
-app.get("/*$", getKarax)
+app.get("/", getKarax)
 app.run()
 
