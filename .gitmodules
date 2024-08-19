@@ -3,5 +3,5 @@
 	url = https://github.com/picturepan2/spectre
 
 [submodule "public/js/mathjax"]
-	path = MathJax
+	path = public/js/mathjax
 	url = https://github.com/mathjax/MathJax
