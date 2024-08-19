@@ -184,6 +184,9 @@ const
   angleLowerLimit = 0.0 # Lower limit when canon is too close to the floor
   hiddenFormulaVal = "__"
 
+let
+  formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
+
 proc gravities(state: ParabolaState): auto = 
   {state.lang.pluto: 0.7, state.lang.moon: 1.6, state.lang.mercAndMars: 3.7, 
     state.lang.uranus: 8.7, state.lang.venus: 8.9, state.lang.saturn: 9, 
@@ -203,7 +206,7 @@ proc initCanonState(angle: float, deg = false, speed: float,
   result.setSpeed(speed)
 
 proc initTrajectory(): Trajectory = 
-  Trajectory(closestPoint: -1, highestPoint: -1, pinnedPoint: 0, extraPoint: -1, 
+  Trajectory(closestPoint: -1, highestPoint: -1, pinnedPoint: -1, extraPoint: -1, 
     state: initCanonState(0, deg = true, 
       canonInitialSpeed, gravity = vec(0, (9.807 * muMeterFactor) / 
         gravityFactor))
@@ -211,9 +214,6 @@ proc initTrajectory(): Trajectory =
 
 template trajectory(state: ParabolaState): Trajectory = 
   state.trajectories[state.currentTrajectory]
-
-#proc trajectory(state: var ParabolaState): var Trajectory = 
-#  state.trajectories[state.currentTrajectory]
 
 proc getPos(state: ParabolaState, p: TrajectoryPoint): Vec = 
   ## Converts p.pos into matter-js coordinates
@@ -403,108 +403,93 @@ proc updateFormulaAccordion(state: var ParabolaState) =
   let gTimesHTwice = 2 * gTimesH
 
   let changes = {
-    "#vix > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      toggleFormula("vix", state.showFormulaResults, 
-        &"{state.strfloat(siInitialState.vel.x)}m/s", hideResult = true),
-    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
-      &"{state.strfloat(siInitialState.speed)}m/s",
-    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-texatom:nth-child(3) > mjx-mi:nth-child(1)":
-      &"{siInitialState.angleDeg:.0f}°",
-    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.vel.x)}m/s",    
-
-    "#viy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      toggleFormula("viy", state.showFormulaResults, 
-        &"{state.strfloat(siInitialState.vel.y)}m/s", hideResult = true),
-    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
-      &"{state.strfloat(siInitialState.speed)}m/s",
-    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-texatom:nth-child(3) > mjx-mi:nth-child(1)":
-      &"{siInitialState.angleDeg:.0f}°",
-    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.vel.y)}m/s",    
-
-    "#maxheight > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#maxheight > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       if state.trajectory.highestPoint == 0:
         toggleFormula("maxheight", false, "")
       else:
         toggleFormula("maxheight", state.showFormulaResults,
           &"{state.strfloat(state.trajectory.maxHeight.toMuDistance)}m", hideResult = true),
-    "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
-      &"{state.strfloat(siInitialState.height + (vySquared / gTwice))}m",
-    "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(3)":
-      &"{state.strfloat(vySquared / gTwice)}m",
-    "#mh4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#mh1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.height)}m",
-    "#mh2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
-      &"{state.strfloat(gTwice)}m/s²",
-    "#mh2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mi:nth-child(2)":
-      &"{state.strfloat(vySquared)}m²/s²",
-    "#mh2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
-      &"{state.strfloat(siInitialState.height)}m",
-    "#mh1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(5)":
+    "#mh1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(7)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#mh1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msup:nth-child(1) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(2)":
+    "#mh1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(2)":
        &"{state.strfloat(siInitialState.vel.y)}m/s",
-    "#mh1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#mh2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
+      &"{state.strfloat(vySquared)}m²/s²",
+    "#mh2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
+      &"{state.strfloat(gTwice)}m/s²",
+    "#mh2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.height)}m",
+    "#mh4 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
+      &"{state.strfloat(siInitialState.height)}m",
+    "#mh4 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
+      &"{state.strfloat(vySquared / gTwice)}m",
+    "#mh4 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+      &"{state.strfloat(siInitialState.height + (vySquared / gTwice))}m",
 
-    "#l_f-2 > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#l_f-2 > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       toggleFormula("timeflight", state.showFormulaResults, 
         &"{state.strfloat(state.trajectory.totalTime)}s", hideResult = true),
-    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-msup:nth-child(1) > mjx-mi:nth-child(1)":
-      &"({state.strfloat(siInitialState.vel.y)}m/s)",
-    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+    "#tf1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
-    "mjx-mi.mjx-i:nth-child(9)":
+    "#tf1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1)":
+      &"({state.strfloat(siInitialState.vel.y)}m/s)",
+    "#tf1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(13)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "span.mord:nth-child(19)":
       &"{state.strfloat(siInitialState.height)}m",
-    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+    "#tf1 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#tf1 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
-      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+
+    "#tf2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
        &"{state.strfloat(siInitialState.vel.y)}m/s", 
-    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
+    "#tf2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(vySquared)}m²/s²", 
-    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+    "#tf2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(13)":
       &"{state.strfloat(gTimesH)}m²/s²", 
-    "#tf2 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+    "#tf2 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²", 
-    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
-      &"{state.strfloat(vySquared)}m²/s²", 
-    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+
+    "#tf3 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
        &"{state.strfloat(siInitialState.vel.y)}m/s", 
-    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(5)": 
+    "#tf3 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
+      &"{state.strfloat(vySquared)}m²/s²", 
+    "#tf3 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(7)": 
       &"{state.strfloat(gTimesHTwice)}m²/s²",
-    "#tf3 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+    "#tf3 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#tf4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
-      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#tf4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+    
+    "#tf4 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.y)}m/s", 
-    "#tf4 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msqrt:nth-child(5) > mjx-sqrt:nth-child(1) > mjx-box:nth-child(2) > mjx-mrow:nth-child(1) > mjx-mrow:nth-child(1) > mjx-mi:nth-child(1)":
+    "#tf4 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(vySquared + gTimesHTwice)}",
-    "#tf5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+    "#tf4 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    
+    "#tf5 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",  
-    "#tf5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
-      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#tf5 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(5)":
+    "#tf5 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7)":
       &"{state.strfloat(sqrt(vySquared + gTimesHTwice))}m/s",
-    "#tf6 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mi:nth-child(2)":
-      &"{state.strfloat(siInitialState.vel.y + sqrt(vySquared + gTimesHTwice))}m/s",
-    "#tf6 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mstyle:nth-child(3) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-dbox:nth-child(2) > mjx-dtable:nth-child(1) > mjx-row:nth-child(2) > mjx-den:nth-child(1) > mjx-mi:nth-child(2)":
+    "#tf5 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#tf6 > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+
+    "#tf6 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
+      &"{state.strfloat(siInitialState.vel.y + sqrt(vySquared + gTimesHTwice))}m/s",
+    "#tf6 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(1)":
+      &"{state.strfloat(siInitialState.gravity.y)}m/s²",
+    "#tf6 > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat((siInitialState.vel.y + sqrt(vySquared + gTimesHTwice)) / siInitialState.gravity.y)}s",
     
-    "#l_f-3 > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#l_f-3 > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       toggleFormula("maxrangediv", state.showFormulaResults, 
         &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m", hideResult = true),
 
-    "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#maxRange > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.x)}m/s",
-    "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+    "#maxRange > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat(state.trajectory.totalTime)}s",
-    "#maxRange > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#maxRange > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(state.trajectory.maxRange.toMuDistance)}m",
   }
 
@@ -524,6 +509,31 @@ proc updateStateAccordion(state: var ParabolaState) =
   getElementById("state-input-vx").value = cstring state.strfloat(siInitialState.vel.x)
   getElementById("state-input-vy").value = cstring state.strfloat(siInitialState.vel.y)
   getElementById("state-input-g").value = cstring state.strfloat(siInitialState.gravity.y)
+
+  let changes = {
+    "#vix > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+      toggleFormula("vix", state.showFormulaResults, 
+        &"{state.strfloat(siInitialState.vel.x)}m/s", hideResult = true),
+    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
+      &"{state.strfloat(siInitialState.speed)}m/s",
+    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(4) > span:nth-child(1)":
+      &"{siInitialState.angleDeg:.0f}°",
+    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+      &"{state.strfloat(siInitialState.vel.x)}m/s",    
+
+    "#viy > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+      toggleFormula("viy", state.showFormulaResults, 
+        &"{state.strfloat(siInitialState.vel.y)}m/s", hideResult = true),
+    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
+      &"{state.strfloat(siInitialState.speed)}m/s",
+    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(4) > span:nth-child(1)":
+      &"{siInitialState.angleDeg:.0f}°",
+    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+      &"{state.strfloat(siInitialState.vel.y)}m/s",    
+  }
+  
+  for (query, value) in changes:
+    document.querySelector(cstring query).innerText = cstring value
 
   if state.frozen:
     state.unfreeze()
@@ -559,92 +569,96 @@ proc updatePointAccordion(state: var ParabolaState) =
   siInitialState.gravity = siInitialState.gravity * gravityFactor
 
   let changes = {
-    "#x > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
+    "#x > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       if not show:
         toggleFormula("x", false, "")
       else:
         toggleFormula("x", state.showFormulaResults, 
           &"{state.strfloat(point.pos.x)}m", hideResult = true),
-    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(4) > mjx-mi:nth-child(1)":
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(point.time)}s",
-    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(4) > mjx-mi:nth-child(6)":
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.x)}m/s",
-    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
+    "#x > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(point.pos.x)}m",
 
-    "#y > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
+    "span.base:nth-child(6) > span:nth-child(2)":
       if not show:
         toggleFormula("y", false, "")
       else:
         toggleFormula("y", state.showFormulaResults, 
           &"{state.strfloat(point.pos.y)}m", hideResult = true),
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.height)}m",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat(point.time)}s",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(5) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",  
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-msup:nth-child(5) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(5) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7) > span:nth-child(1)":
       &"({state.strfloat(point.time)}s)",
 
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.height)}m",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat(point.time * siInitialState.vel.y)}m",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",  
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(9) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mrow:nth-child(2) > mjx-mi:nth-child(5)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(7)":
       &"{state.strfloat(point.time ^ 2)}s²",
 
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(3) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(3) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.height + (point.time * siInitialState.vel.y))}m",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(3) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mstyle:nth-child(5) > mjx-mfrac:nth-child(1) > mjx-frac:nth-child(1) > mjx-num:nth-child(1) > mjx-mi:nth-child(2)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(3) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(3) > span:nth-child(2) > span:nth-child(1)":
       &"{state.strfloat(siInitialState.gravity.y * (point.time ^ 2))}m",  
 
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.height + (point.time * siInitialState.vel.y))}m",
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat((siInitialState.gravity.y * (point.time ^ 2)) / 2)}m",  
-    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#y > div:nth-child(3) > ul:nth-child(1) > li:nth-child(4) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(point.pos.y)}m",
 
-    "#vx > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
+    "#vx > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       if state.showFormulaResults: 
         &"{state.strfloat(siInitialState.vel.x)}m/s"
       else:
         hiddenFormulaVal,
 
-    "#vy > label:nth-child(2) > mjx-container:nth-child(2) > mjx-math:nth-child(1) > mjx-mi:nth-child(7)":
+    "#vy > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(5) > span:nth-child(2)":
       if not show:
         toggleFormula("vy", false, "")
       else:
         toggleFormula("vy", state.showFormulaResults, 
           &"{state.strfloat(point.vel.y)}m/s", hideResult = true),
-    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
-    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(1)":
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.gravity.y)}m/s²",
-    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mrow:nth-child(5) > mjx-mi:nth-child(5)":
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(point.time)}s",
 
-    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(1)":
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",
-    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mrow:nth-child(3) > mjx-mi:nth-child(5)":
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.gravity.y * point.time)}m/s",
-    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > mjx-container:nth-child(1) > mjx-math:nth-child(1) > mjx-mi:nth-child(5)":
+    "#vy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(2) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(point.vel.y)}m/s"
   }
 
   for (query, value) in changes:
-    echo query
     document.querySelector(cstring query).innerText = cstring value
 
   if state.frozen:
     state.unfreeze()
 
 proc calcTrajectory(state: var ParabolaState) =
+  # If you change the trajectory while a bullet is being traced, disable follow bullet
+  if state.followBullet and state.canon.flyingBullets.len > 0:
+    getElementById("point-input-f").checked = false
+    state.followBullet = false
+
   var initialState = state.trajectory.state
   initialState.gravity = initialState.gravity * gravityFactor
 
@@ -935,7 +949,7 @@ proc initParabolaState*(): ParabolaState =
         zIndex: 0, isStatic: false, frictionAir: 0, friction: 1, frictionStatic: 1, 
         collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: cstring"bullet",
       }),
-    trajectories: @[initTrajectory()], lang: Spanish
+    trajectories: @[initTrajectory()], lang: English
   )
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
@@ -1450,11 +1464,6 @@ proc onImagesLoaded(state: var ParabolaState) =
 
   state.startedRendering = true
 
-#proc typesetMathjax(): Future[void] = 
-#  var promise = newPromise() do (resolve: proc()):
-#    # Matter.Render all MathJax expressions synchronously
-#    (resolve)
-
 proc toggleStarsAnimation(to: bool) = 
   for e in document.querySelectorAll(".stars"):
     e.style.animationPlayState = cstring(
@@ -1579,9 +1588,9 @@ proc load*(state: var ParabolaState) =
     img.onload = proc() =
       inc loadedImgCount
       if loadedImgCount == images.len:
-        # Typeset mathjax expressions before since onImagesLoaded updates them
-        MathJax.typesetPromise().then proc() = 
-          state.onImagesLoaded()
+        # Remnder KaTex expressions before since onImagesLoaded updates them
+        renderMathInElement(document.body.toJs)
+        state.onImagesLoaded()
 
     img.src = src
     state.render.textures[src] = img
@@ -1619,48 +1628,21 @@ proc renderLeftDiv(state: var ParabolaState): VNode =
 
 proc renderFormulasAccordion(state: var ParabolaState): VNode =
   let liStyle = "margin-top: 20px;".toCss
-  let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
   buildHtml tdiv(class = "container"):
-    tdiv(id = "vix", class = "accordion"):
-      input(`type` = "checkbox", name  = "accordion-checkbox", 
-        id = "accordion-f--1", hidden = true, checked = false)
-      label(class = "accordion-header tooltip tooltip-bottom", `for` = "accordion-f--1", 
-        `data-tooltip` = cstring state.lang.vix):
-        italic(class = "icon icon-arrow-right mr-1")
-        text r"\(v_{ix} = v\:\cdot\:\cos{\alpha} = d\)"
-
-      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
-        ul(style = "list-style-type: none;".toCss):
-          li(): 
-            text r"\(v_{ix} = v\:\cdot\:\cos{a} = d\)"
-    
-    tdiv(id = "viy", class = "accordion"):
-      input(`type` = "checkbox", name  = "accordion-checkbox", 
-        id = "accordion-f-0", hidden = true, checked = false)
-      label(class = "accordion-header tooltip", `for` = "accordion-f-0", 
-        `data-tooltip` = cstring state.lang.viy):
-        italic(class = "icon icon-arrow-right mr-1")
-        text r"\(v_{iy} = v\:\cdot\:\sin{\alpha} = d\)"
-
-      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
-        ul(style = "list-style-type: none;".toCss):
-          li(): 
-            text r"\(v_{iy} = v\:\cdot\:\sin{a} = d\)"
-
     tdiv(id = "maxheight", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-1", hidden = true, checked = false)
-      label(class = "accordion-header tooltip", `for` = "accordion-f-1", 
+      label(class = "accordion-header tooltip tooltip-bottom", `for` = "accordion-f-1", 
         `data-tooltip` = cstring state.lang.maxHeight, 
         `disabled-data-tooltip` = cstring state.lang.disabledMaxHeight):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(h_{max} = h + \dfrac{2v_{iy}^{2}}{2g} = d\)"
+        text r"\(h_{max} = h + \dfrac{v_{iy}^{2}}{2g} = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
           li(id = "mh1"): # font-size: 1.2em;
-            text r"\(h_{max} = h + \dfrac{(v)^{2}}{2\:\cdot\:g}\)"
+            text r"\(h_{max} = h + \dfrac{(v)^{2}}{2\:\cdot\:10.1}\)"
           li(id = "mh2", style = liStyle):
             text r"\(h_{max} = h + \dfrac{v}{g}\)"
           li(id = "mh4", style = liStyle):
@@ -1881,19 +1863,36 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
 
-    #p(text &"total time = {state.strfloat(state.trajectory.totalTime)}")
+    tdiv(id = "vix", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f--1", hidden = true, checked = false)
+      label(class = "accordion-header tooltip", `for` = "accordion-f--1", 
+        `data-tooltip` = cstring state.lang.vix, style = "padding: 0 0 0.6rem;".toCss):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(v_{ix} = v\:\cdot\:\cos{\alpha} = d\)"
 
-    #p(text &"max height = {state.strfloat(state.trajectory.maxHeight.toMuDistance)}")
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(v_{ix} = v\:\cdot\:\cos{a} = d\)"
+    
+    tdiv(id = "viy", class = "accordion"):
+      input(`type` = "checkbox", name  = "accordion-checkbox", 
+        id = "accordion-f-0", hidden = true, checked = false)
+      label(class = "accordion-header tooltip", `for` = "accordion-f-0", 
+        `data-tooltip` = cstring state.lang.viy, style = "padding: 0 0 0.6rem;".toCss):
+        italic(class = "icon icon-arrow-right mr-1")
+        text r"\(v_{iy} = v\:\cdot\:\sin{\alpha} = d\)"
 
-    #p(text &"max range = {state.strfloat(state.trajectory.maxRange.toMuDistance)}")
-
-    # p(text fmt"\(a = \frac{{v_f - {bullet.position.x}}}{{\Delta t}}\)", style = "font-size: 80px;".toCss)
+      tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
+        ul(style = "list-style-type: none;".toCss):
+          li(): 
+            text r"\(v_{iy} = v\:\cdot\:\sin{a} = d\)"
 
 proc renderPointAccordion(state: var ParabolaState): VNode =
   #let (show, point) = state.currentPoint()
 
   let liStyle = "margin-top: 20px;".toCss
-  let formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
 
   proc changeXTo(x: float) = 
     if not state.startedRendering or state.trajectory.points.len == 0: return

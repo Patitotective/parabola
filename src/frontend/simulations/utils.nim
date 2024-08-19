@@ -52,10 +52,11 @@ const
 
 var
   Infinity* {.importjs, nodecl.}: JsObject
-  MathJax* {.importjs, nodecl.}: JsObject
   undefined* {.importjs, nodecl.}: JsObject
   Object* {.importjs, nodecl.}: JsObject
   Epsilon* {.importjs: "Number.EPSILON", nodecl.}: JsObject
+
+proc renderMathInElement*(ele: JsObject) {.importjs: "renderMathInElement(#)".}
 
 proc jsSleep*(ms: int) {.importjs: "await new Promise(r => setTimeout(r, #))".}
 

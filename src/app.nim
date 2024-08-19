@@ -12,9 +12,12 @@ proc getKarax(ctx: Context) {.async.} =
       "frontend": "/public/js/frontend.js",
       "style": "/public/css/style.css",
       "favicon": "/public/img/favicon.ico",
-      "mathjax": "/public/js/mathjax/startup.js",
+      "katexcss": "/public/js/katex/katex.min.css",
+      "katex": "/public/js/katex/katex.min.js",
+      "katexauto": "/public/js/katex/contrib/auto-render.min.js",
       "matterwrap": "/public/js/matter-wrap/matter-wrap.min.js",
       "matterjs": "/public/js/matter-js/matter.min.js",
+      "googlecss": "/public/css/google-icons.css",
       # "timestamp": encodeUrl(CompileDate & CompileTime),
       # "ga": config.ga
     }.newStringTable()

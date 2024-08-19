@@ -35,35 +35,34 @@ task htmljs, "Generates single html page's JavaScript":
   exec "nim js -d:relativePath --out:dist/app.js src/frontend"
 
 task makedist, "Creates the dist directory":
-  mkDir "dist"
-
-  cpFile "public/css/style.css", "dist/style.css"
+  mkDir "dist/css"
+  cpFile "public/css/style.css", "dist/css/style.css"
+  cpFile "public/css/google-icons.css", "dist/css/google-icons.css"
+  cpFile "public/css/google-icons.woff2", "dist/css/google-icons.woff2"
   cpDir "public/img", "dist/img"
 
   cpDir "public/js/matter-wrap", "dist/matter-wrap"
   cpDir "public/js/matter-js", "dist/matter-js"
   
-  mkDir "dist/mathjax/input"
-  #mkDir "dist/mathjax/a11y"
+  mkDir "dist/katex/contrib"
+  cpDir "public/js/katex/fonts", "dist/katex/fonts"
 
-  #cpFile "public/js/mathjax/a11y/explorer.js", "dist/mathjax/a11y/explorer.js"
-  #cpFile "public/js/mathjax/a11y/semantic-enrich.js", "dist/mathjax/a11y/semantic-enrich.js"
-  #cpFile "public/js/mathjax/a11y/sre.js", "dist/mathjax/a11y/sre.js"
-  #cpFile "public/js/mathjax/a11y/complexity.js", "dist/mathjax/a11y/complexity.js"
-  #cpFile "public/js/mathjax/a11y/assistive-mml.js", "dist/mathjax/a11y/assistive-mml.js"
-
-  cpFile "public/js/mathjax/input/mml.js", "dist/mathjax/input/mml.js"
-  cpFile "public/js/mathjax/tex-chtml.js", "dist/mathjax/tex-chtml.js"
+  cpFile "public/js/katex/katex.min.js", "dist/katex/katex.min.js"
+  cpFile "public/js/katex/katex.min.css", "dist/katex/katex.min.css"
+  cpFile "public/js/katex/contrib/auto-render.min.js", "dist/katex/contrib/auto-render.min.js"
 
   writeFile "dist/index.html", readFile("public/karax.html") %
     {
       "title": config.title,
       "frontend": "./app.js",
-      "style": "./style.css",
+      "style": "./css/style.css",
       "favicon": "./img/favicon.ico",
-      "mathjax": "./mathjax/tex-chtml.js",
       "matterwrap": "./matter-wrap/matter-wrap.min.js",
       "matterjs": "./matter-js/matter.min.js",
+      "katexcss": "./katex/katex.min.css",
+      "katex": "./katex/katex.min.js",
+      "katexauto": "./katex/contrib/auto-render.min.js",
+      "googlecss": "./css/google-icons.css"
       # "timestamp": encodeUrl(CompileDate & CompileTime),
       # "ga": config.ga
     }.newStringTable()

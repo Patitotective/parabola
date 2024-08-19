@@ -1,6 +1,6 @@
 ## This is the module that manipulates the frontend using karax
 
-import std/[dom, jsffi]
+import std/[dom]
 import karax/[karax, vdom]
 
 # import matter
@@ -49,8 +49,8 @@ proc render(): VNode =
 proc postRender() =
   # Since matter needs to find the canvas element, if we load the simulation before karax has created the canvas element it won't work
   if not state.matterLoaded:
-    # Load the simulation until MathJax is done loading
-    if not MathJax.typesetPromise.isNil:
+    # Load the simulation until KaTex is done loading
+    if not renderMathInElement.isNil:
       state.parabola.load()
       state.matterLoaded = true
     else:
