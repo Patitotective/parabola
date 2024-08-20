@@ -98,7 +98,7 @@ i18nInit Locale, true:
     Spanish = "Trayectorias"
   trajTooltip:
     English = "Double-click a trajectory to delete it"
-    Spanish = "Da doble click sobre una trajectoria\npara eliminarla"
+    Spanish = "Da doble clic sobre una trajectoria\npara eliminarla"
   iniState:
     English = "Initial State"
     Spanish = "Estado Inicial"
@@ -130,18 +130,55 @@ i18nInit Locale, true:
     English = "Animate background stars"
     Spanish = "Animar las estrellas de fondo"
   aboutMsg:
-    English = "Made by Patitotective. Source code in "
+    English = "$v. Made by Patitotective. Source code in "
     Spanish = "Hecho por Patitotective. Código fuente en "
+  animationWarning:
+    English = "Has a high impact in the performance"
+    Spanish = "Tiene un alto impacto en el rendimiento"
+  help:
+    English = "Help"
+    Spanish = "Ayuda"
+  help1:
+    English = "You can change the initial angle of the canon by dragging the canon or by pressing the right and left keys."
+    Spanish = "Puedes cambiar el ángulo inicial del cañón arrastrando el cañon o presionando las flechas de derecha y izquierda."
+  help2:
+    English = "You can move the canon in the Y axis by dragging the base of the canon or the platform below the canon."
+    Spanish = "Puedes mover el cañón en el eje Y arrastrando la base del cañón o la plataforma debajo del cañón."
+  help3:
+    English = "You can change the inital speed of the canon by moving the wheel on your mouse, by dragging with two fingers in your touchpad or by pressing the up and down keys."
+    Spanish = "Puiedes cambiar la rapidez inicial del cañón moviendo la rueda del mouse, arrastrando con dos dedos en el touchpad o presionando las flechas de arriba y abajo."
+  help4:
+    English = "You can select any point in the trajectory by double-clicking and dragging the mouse, you can remove this point by double-clicking far from the trajectory."
+    Spanish = "Puedes seleccionar cualquier punto en la trayectoria dando doble clic y arrastrando el mouse, puedes quitar este punto dando doble clic lejos de la trayectoria."
+  help5:
+    English = "You can pause the simulation by pressing the key P."
+    Spanish = "Puedes pausar la simulación presionand la tecla P."
+  help6:
+    English = "You can fire a bullet by pressing the wheel on your mouse, pressing with three fingers in your touchpad or by pressing the spacebar."
+    Spanish = "Puedes disparar una bala presionando la rueda del mouse, presionando con tres dedos en el touchpad o presionando la barra espaciadora."
+  help7:
+    English = "You can add a new trajectory by pressing the enter key."
+    Spanish = "Puedes añadir una trayectoria nueva presionando la tecla enter."
+  help8:
+    English = "You can grab any bullet or rectangle and move it around the screen."
+    Spanish = "Puedes agarrar cualquier bala o rectángulo y moverlo alrededor de la pantalla."
+  help9:
+    English = "You can restart the simulation to the initial state by pressing the backspace key."
+    Spanish = "Puedes reiniciar la simulación a su estado inicial presionando la tecla backspace o retroceso."
+  help10:
+    English = "Remember that all of the values are rounded to two decimal places."
+    Spanish = "Recuerda que todos los valores están redondeados a dos decimales."
 
-  #ihaveCat:
-  #  English = "I've many cats."
-  #  Chinese = "我有很多小猫。"
-  #  Myanmar = "ငါ့ဆီမှာ ကြောင် အများကြီးရှိတယ်။"
-  #  # translation definition can have sub-translation definition
-  #  withCount:
-  #    # translations can be lambda / closure
-  #    English = proc(count: int): string =
-  #      case count
-  #      of 0: "I don't have a cat."
-  #      of 1: "I have one cat."
-  #      else: "I have " & $count & " cats."
+  helpFooter:
+    English = "v$v. Feel free to ask more questions or report bugs in "
+    Spanish = "v$v. Si tienes más preguntas o quieres reportar un problema visita "
+
+  togglePauseTooltip:
+    English = "Press P"
+    Spanish = "Presiona la P"
+  reloadTooltip:
+    English = "Press backspace"
+    Spanish = "Presiona retroceso"
+  fireTooltip:
+    English = "Press space or middle-click"
+    Spanish = "Presiona espacio o\nda clic con la rueda"

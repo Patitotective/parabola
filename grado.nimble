@@ -68,12 +68,12 @@ task makedist, "Creates the dist directory":
     }.newStringTable()
 
 task htmlpage, "Generates a single html page":
-  cssTask()
   htmljsTask()
+  cssTask()
   makedistTask()
 
-task rhtmlpage, "Generates a single html page":
-  exec "nimble c -r -d:release --mm:refc src/buildcss"
+task rhtmlpage, "Generates a release version single html page":
+  cssTask()
   exec "nim js -d:relativePath -d:release --out:dist/app.js src/frontend"
 
   makedistTask()

@@ -173,9 +173,14 @@ const
   canonBaseTexture = path "img/canonBase.png"
   canonPlatformTexture = path "img/canonPlatform.png"
 
-  trajectoryStrokeStyles = ["Orange", "Salmon", "Crimson", "Pink", "HotPink", "Tomato", 
-  "Gold", "Khaki", "Violet", "SlateBlue", "YellowGreen", "LightSeaGreen", 
-  "SkyBlue"]
+  trajectoryStrokeStyles = ["Orange", # 16 colors = 16 possible trajectories
+    "Khaki", "Gold", 
+    "YellowGreen", "LightSeaGreen", 
+    "rgb(200, 200, 250)", "SkyBlue", "CornflowerBlue", # First one is a bluer Lavanda
+    "SlateBlue", "DarkOrchid", "Violet", "Pink", "HotPink",
+    "Crimson", "OrangeRed", "Salmon"
+  ]
+
   trajectoryLineWidth = 2
   trajectoryPointRadius = 7 # The radius of the trajectory point hovered by the mouse
   
@@ -265,7 +270,7 @@ proc unpause(state: var ParabolaState) =
   state.paused = false
 
 proc freeze(state: var ParabolaState) = 
-  state.pause()
+  state.runner.enabled = false
   Matter.Render.stop(state.render)
   # I realized that sometimes the canvas would go blank when it froze so I
   # thought the render might stop and leave the canvas blank so we run it once
@@ -275,7 +280,7 @@ proc freeze(state: var ParabolaState) =
   state.frozen = true
 
 proc unfreeze(state: var ParabolaState) = 
-  state.unpause()
+  state.runner.enabled = true
   Matter.Render.run(state.render)
   state.frozen = false
 
@@ -951,7 +956,7 @@ proc initParabolaState*(): ParabolaState =
         zIndex: 0, isStatic: false, frictionAir: 0, friction: 1, frictionStatic: 1, 
         collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: cstring"bullet",
       }),
-    trajectories: @[initTrajectory()], lang: English
+    trajectories: @[initTrajectory()], lang: Spanish
   )
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
@@ -1548,7 +1553,7 @@ proc load*(state: var ParabolaState) =
     state.canvasSize.y * 0.6, 20, 80, 
     JsObject{zIndex: 0, isStatic: false, label: cstring"Thingy", frictionAir: 0.1, 
       friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
-      collisionFilter: JsObject{category: 2, mask: 3}, sleepThreshold: 1,
+      collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
   })
   #Matter.Body.setInertia(state.thingy, 0.1)
 
@@ -1740,6 +1745,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
           proc onwheel(e: Event, n: VNode) = 
             e.preventDefault()
+            if document.activeElement.isNil or not document.activeElement.toJs.isEqualNode(n.dom).to(bool): return
 
             var h = 0.0
             discard parseFloat($n.value, h)
@@ -1784,6 +1790,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
           proc onwheel(e: Event, n: VNode) = 
             e.preventDefault()
+            if document.activeElement.isNil or not document.activeElement.toJs.isEqualNode(n.dom).to(bool): return
 
             var s = 0.0
             discard parseFloat($n.value, s)
@@ -1834,6 +1841,8 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
               proc onwheel(e: Event, n: VNode) = 
                 e.preventDefault()
+                if document.activeElement.isNil or not document.activeElement.toJs.isEqualNode(n.dom).to(bool): return
+
                 var g = 0.0
                 discard parseFloat($n.value, g)
                 if e.toJs.wheelDelta.to(float) > 0: g += 1
@@ -2027,6 +2036,8 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
 
           proc onwheel(e: Event, n: VNode) = 
             e.preventDefault()
+            if document.activeElement.isNil or not document.activeElement.toJs.isEqualNode(n.dom).to(bool): return
+
             var x = 0.0
             discard parseFloat($n.value, x)
             if e.toJs.wheelDelta.to(float) > 0: x += 1
@@ -2054,6 +2065,8 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
 
           proc onwheel(e: Event, n: VNode) = 
             e.preventDefault()
+            if document.activeElement.isNil or not document.activeElement.toJs.isEqualNode(n.dom).to(bool): return
+
             var t = 0.0
             discard parseFloat($n.value, t)
             if e.toJs.wheelDelta.to(float) > 0: t += 0.1
@@ -2179,6 +2192,39 @@ proc addTrajectory(state: var ParabolaState) =
     state.calcTrajectory()
     if not kxi.surpressRedraws: redraw(kxi)
 
+proc renderHelpModal(state: var ParabolaState): VNode = 
+  buildHtml tdiv(class = "modal", id = "help-modal"):
+    a(class = "modal-overlay", `aria-label`="Close"):
+      proc onclick() = 
+        getElementById("help-modal").classList.remove("active")
+
+    tdiv(class = "modal-container"):
+      tdiv(class = "modal-header"):
+        a(class = "btn btn-clear float-right", `aria-label`="Close"):
+          proc onclick() = 
+            getElementById("help-modal").classList.remove("active")
+
+        tdiv(class = "modal-title h5"): text state.lang.help
+
+      tdiv(class = "modal-body"):
+        tdiv(class = "content"):
+          ul:
+            li text state.lang.help1
+            li text state.lang.help2
+            li text state.lang.help3
+            li text state.lang.help4
+            li text state.lang.help5
+            li text state.lang.help6
+            li text state.lang.help7
+            li text state.lang.help8
+            li text state.lang.help9
+            li text state.lang.help10
+
+      tdiv(class = "modal-footer"):
+        text state.lang.helpFooter("v", config.version)
+        a(href = cstring config.website): text "GitHub"
+        text "."
+
 proc renderSettingsModal(state: var ParabolaState): VNode = 
   proc onClickStep(t: float): auto = 
     proc(e: Event, n: VNode) = 
@@ -2226,6 +2272,11 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                     discard parseInt($n.value, i)
                     state.lang = Locale(i)
                     if not kxi.surpressRedraws: redraw(kxi)
+                    discard setTimeout(proc() = 
+                      state.updateFormulaAccordion()
+                      state.updateStateAccordion()
+                      state.updatePointAccordion()
+                    , 100)
 
             tdiv(class = "form-group"): 
               label(class = "form-switch"):
@@ -2270,7 +2321,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                 italic(class = "form-icon")
                 text state.lang.showFormulaResults
 
-            tdiv(class = "form-group"): 
+            tdiv(class = "form-group tooltip", `data-tooltip` = cstring state.lang.animationWarning): 
               label(class = "form-switch"):
                 input(`type` = "checkbox", id = "settings-sa", 
                   checked = false):
@@ -2297,9 +2348,39 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                     n.dom.parentElement.setAttr("data-tooltip", n.value)
 
       tdiv(class = "modal-footer"):
-        text state.lang.aboutMsg(config.version)
+        text state.lang.aboutMsg("v", config.version)
         a(href = cstring config.website): text "GitHub"
         text "."
+
+proc renderButtons(state: var ParabolaState): VNode = 
+  buildHtml tdiv(class = "btn-group btn-group-block", style = toCss "margin-left: 1rem; margin-right: 1rem;"):
+    button(class = "btn btn-action btn-primary tooltip", `data-tooltip` = cstring state.lang.fireTooltip):
+      span(class = "material-symbols-outlined"): text "rocket_launch"
+
+      proc onclick() = 
+        state.fireBullet()
+
+    button(class = "btn btn-action btn-primary tooltip", `data-tooltip` = cstring state.lang.togglePauseTooltip):
+      span(class = "material-symbols-outlined"):
+        if state.paused: text "play_arrow"
+        else: text "pause"
+
+      proc onclick() = 
+        if not state.startedRendering: return
+
+        if state.paused:
+          if state.frozen:
+            state.unfreeze()
+          state.unpause()
+        else:
+          state.pause()
+    
+    button(class = "btn btn-action btn-primary tooltip", `data-tooltip` = cstring state.lang.reloadTooltip):
+      span(class = "material-symbols-outlined"): text "refresh"
+
+      proc onclick() = 
+        if state.startedRendering:
+          state.reload()
 
 proc renderTrajectories(state: var ParabolaState): VNode = 
   proc onRadioChange(e: int): auto = 
@@ -2340,7 +2421,9 @@ proc renderTrajectories(state: var ParabolaState): VNode =
       tdiv(class = "col-7", id = "traj-radios"): 
         if state.trajectories.len < trajectoryStrokeStyles.len:
           button(class = "btn btn-action btn-sm", style = "margin-right: 0.5rem;".toCss):
-            italic(class = "icon icon-plus")
+            #italic(class = "icon icon-plus")
+            span(class = "material-symbols-outlined"): text "add"
+
             proc onclick() = state.addTrajectory()
 
         for e, t in state.trajectories:
@@ -2349,27 +2432,29 @@ proc renderTrajectories(state: var ParabolaState): VNode =
           label(class = "form-radio form-inline", ondblclick = onRemoveClick(e)):
             input(`type`  = "radio", name = "trajectory",
               onchange = onRadioChange(e), checked = checked)
-            italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: {color}")
+            italic(class = "form-icon", style = toCss &"background-color: {color}; border-color: color-mix(in srgb, black 15%, {color});")
 
-      tdiv(class = "col-2", style = toCss "padding-right: 0.2rem; display: flex; justify-content: flex-end;"):
+      tdiv(class = "col-2", style = toCss "padding-right: 0.4rem; display: flex; justify-content: flex-end;"):
         button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
           span(class = "material-symbols-outlined"): text "help"
           proc onclick() = 
-            discard
-            #getElementById("settings-modal").classList.add("active")
+            getElementById("help-modal").classList.add("active")
 
         button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
           span(class = "material-symbols-outlined"): text "settings"
           proc onclick() = 
             getElementById("settings-modal").classList.add("active")
 
+    state.renderHelpModal()
     state.renderSettingsModal()
 
 proc renderRightDiv(state: var ParabolaState): VNode =
   buildHtml tdiv(class = "column col-4", style = toCss "overflow: auto; height: 100%; " & 
-      "scrollbar-width: thin;"):
+      "scrollbar-width: thin; border-left: 0.3rem solid darkgray;"):
 
     state.renderTrajectories()
+
+    state.renderButtons()
 
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
@@ -2440,6 +2525,7 @@ proc addEventListeners*(state: var ParabolaState) =
       state.reload()
     of "p":
       state.togglePause()
+      if not kxi.surpressRedraws: redraw(kxi)
     of "Enter":
       state.addTrajectory()
     of "d":
