@@ -1,6 +1,0 @@
-title "Parabola"
-version "1.0.0"
-website "https://github.com/Patitotective/parabola"
-appPath "/"
-port 8081
-hostname "hostname.com"
