@@ -209,8 +209,7 @@ proc fromMuSpeed*(speed: float): float =
 proc fromMuAcceleration*(acceleration: float): float = 
   acceleration * muMeterFactor
 
-proc class*(classes: varargs[tuple[name: string, present: bool]],
-           defaultClasses: string = ""): string =
+proc class*(defaultClasses: string = "", classes: varargs[tuple[name: string, present: bool]],): string =
   result = defaultClasses & " "
   for class in classes:
     if class.present: result.add(class.name & " ")

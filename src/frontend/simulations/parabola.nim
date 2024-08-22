@@ -64,7 +64,7 @@ type
     render*: JsObject
     runner*: JsObject
     canvas*: Element
-    canvasSize*: Vec
+    canvasSize*: Vec # To avoid calling clientWidth/Height too much
 
     # paused is true when the user pauses the simulation
     paused*: bool
@@ -76,7 +76,6 @@ type
     timeAtClick*: Time # the value of getTime() when left-click, used to check double click
 
     canon*: Canon
-    thingy*: JsObject
     ground*: JsObject
 
     trajectories*: seq[Trajectory]
@@ -155,7 +154,7 @@ const
   fps = 60
   timeScale = 0.028
   delta = (1000 / fps) * timeScale # 60fps, 60 times in one second (1000 milliseconds)
-  timeSteps = [0.5, 1, 1.75, 2.5, 3]
+  timeSteps = [0.25, 0.5, 1, 2, 3]
 
   # For some reason if you use the projectile motion formulas with matter-js
   # gravity you get a different trajectory, you instead have to multiply
@@ -188,6 +187,8 @@ const
   speedLimit = (canonInitialSpeed/2)..(canonInitialSpeed*1.69)
   angleLowerLimit = 0.0 # Lower limit when canon is too close to the floor
   hiddenFormulaVal = "__"
+
+  bulletsLimitRange = 1..100
 
 let
   formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
@@ -811,8 +812,8 @@ proc fireBullet(state: var ParabolaState) =
     if state.canon.bullets[b].getPos() == bullet.getPos():
       return
 
-  # If the limit is exceed by 10, remove half of the bullets
-  if state.canon.bullets.len + 1 > state.canon.bulletsLimit + 10:
+  # If the limit is exceed by 10, remove them and leave the limit
+  if state.canon.bullets.len + 1 > state.canon.bulletsLimit + 20:
     var toDelete: seq[int]
     for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit):
       Matter.Composite.remove(state.engine.world, state.canon.bullets[i])
@@ -956,7 +957,7 @@ proc initParabolaState*(): ParabolaState =
         zIndex: 0, isStatic: false, frictionAir: 0, friction: 1, frictionStatic: 1, 
         collisionFilter: JsObject{mask: 0}, sleepThreshold: 1, label: cstring"bullet",
       }),
-    trajectories: @[initTrajectory()], lang: Spanish
+    trajectories: @[initTrajectory()], lang: English
   )
 
 proc onAfterUpdate(state: var ParabolaState, event: JsObject) = 
@@ -1476,11 +1477,103 @@ proc toggleStarsAnimation(to: bool) =
     e.style.animationPlayState = cstring(
       if to: "running" else: "paused")
 
+proc changeLang(state: var ParabolaState, lang: Locale) = 
+  state.lang = lang
+  window.localStorage.setItem("lang", cstring $lang.int)
+
+  if not kxi.surpressRedraws: redraw(kxi)
+  discard setTimeout(proc() = 
+    state.updateFormulaAccordion()
+    state.updateStateAccordion()
+    state.updatePointAccordion()
+  , 100)
+
+proc changeBulletsLimit(state: var ParabolaState, bulletsLimit: int, slider: Node) = 
+  state.canon.bulletsLimit = clamp(bulletsLimit, bulletsLimitRange)
+  slider.setAttr("value", cstring $bulletsLimit)
+
+  # Remove limits that are over the limit
+  if state.canon.bullets.len > state.canon.bulletsLimit:
+    for i in countup(0, state.canon.bullets.len - state.canon.bulletsLimit - 1):
+      state.canon.bullets[i].collisionFilter.mask = 0
+      # If we change the mask but don't wake them, they stay there without being
+      # able to collide with anything, but still since they are sleeping
+      if state.canon.bullets[i].isSleeping.to(bool):
+        Matter.Sleeping.set(state.canon.bullets[i], false)
+
+      if (let a = state.canon.flyingBullets.find(i); a >= 0):
+        state.canon.flyingBullets.delete(a)
+
+proc loadSettings(state: var ParabolaState) = 
+  if (let v = window.localStorage.getItem("lang"); not v.isNil):
+    var i = 0
+    discard parseInt($v, i)
+    if i in Locale.low.int..Locale.high.int:
+      state.changeLang(Locale(i))
+
+  getElementById("langSelect").value = cstring $state.lang.int
+
+  if (let v = window.localStorage.getItem("timescale"); not v.isNil):
+    var i = 0
+    discard parseInt($v, i)
+    state.engine.timing.timeScale = timeScale * timeSteps[i]
+
+  if (let v = window.localStorage.getItem("starsAnimation"); not v.isNil):
+    var b = false
+    try:
+      b = parseBool($v)
+    except ValueError:
+      discard
+    
+    toggleStarsAnimation(b)
+    getElementById("settings-sa").checked = b
+
+  if (let v = window.localStorage.getItem("showVArrow"); not v.isNil):
+    var b = true
+    try:
+      b = parseBool($v)
+    except ValueError:
+      discard
+    state.canon.showVArrow = b
+    getElementById("settings-v").checked = b
+  
+  if (let v = window.localStorage.getItem("showVxArrow"); not v.isNil):
+    var b = true
+    try:
+      b = parseBool($v)
+    except ValueError:
+      discard
+
+    state.canon.showVxArrow = b
+    getElementById("settings-vx").checked = b
+  
+  if (let v = window.localStorage.getItem("showVyArrow"); not v.isNil):
+    var b = true
+    try:
+      b = parseBool($v)
+    except ValueError:
+      discard
+
+    state.canon.showVyArrow = b
+    getElementById("settings-vy").checked = b
+  
+  if (let v = window.localStorage.getItem("formulaResults"); not v.isNil):
+      var b = true
+      try:
+        b = parseBool($v)
+      except ValueError:
+        discard
+
+      state.showFormulaResults = b
+      getElementById("settings-er").checked = b
+
+  if (let v = window.localStorage.getItem("bulletsLimit"); not v.isNil):
+    var i = 0
+    discard parseInt($v, i)
+    state.changeBulletsLimit(i, getElementById("settings-bl").Node)
+
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
-  getElementById("langSelect").value = cstring $state.lang.int
-  toggleStarsAnimation(false)
-
   # Load wrap's plugin and load matter aliases to point to the correct values
   Matter.use("matter-wrap")
 
@@ -1549,13 +1642,26 @@ proc load*(state: var ParabolaState) =
   state.ground.xratio = 0.5
   state.ground.yratio = 1
 
-  state.thingy = Matter.Bodies.rectangle(state.canvasSize.x / 2, 
-    state.canvasSize.y * 0.6, 20, 80, 
-    JsObject{zIndex: 0, isStatic: false, label: cstring"Thingy", frictionAir: 0.1, 
+  let block1 = Matter.Bodies.rectangle(70, 
+    state.canvasSize.y * 0.8, 60, 35, 
+    JsObject{zIndex: 0, isStatic: false, label: cstring"Block 1", frictionAir: 0.1, 
       friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
       collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
   })
-  #Matter.Body.setInertia(state.thingy, 0.1)
+
+  let block2 = Matter.Bodies.rectangle(70, 
+    state.canvasSize.y * 0.7, 40, 55, 
+    JsObject{zIndex: 0, isStatic: false, label: cstring"Block 2", frictionAir: 0.1, 
+      friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
+      collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
+  })
+
+  let block3 = Matter.Bodies.rectangle(70, 
+    state.canvasSize.y * 0.6, 20, 30, 
+    JsObject{zIndex: 0, isStatic: false, label: cstring"Block 3", frictionAir: 0.1, 
+      friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
+      collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
+  })
 
   state.mouse = Matter.Mouse.create(state.canvas)
   state.render.mouse = state.mouse
@@ -1574,7 +1680,7 @@ proc load*(state: var ParabolaState) =
 
   Matter.Composite.add(state.engine.world, toJs [
     state.canon.body, state.mouseCons,
-    state.thingy, state.canon.base.body,
+    block1, block2, block3, state.canon.base.body,
     state.canon.platform.body,
     # Walls
     roof, # up
@@ -1582,6 +1688,8 @@ proc load*(state: var ParabolaState) =
     state.ground, # down
     # Matter.Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
   ])
+
+  state.loadSettings()
 
   # Wait until all textures are loaded
   var loadedImgCount = 0
@@ -2226,10 +2334,11 @@ proc renderHelpModal(state: var ParabolaState): VNode =
         text "."
 
 proc renderSettingsModal(state: var ParabolaState): VNode = 
-  proc onClickStep(t: float): auto = 
+  proc onClickStep(index: int, t: float): auto = 
     proc(e: Event, n: VNode) = 
       e.preventDefault()
       state.engine.timing.timeScale = timeScale * t
+      window.localStorage.setItem("timescale", cstring $index)
 
   buildHtml tdiv(class = "modal", id = "settings-modal"):
     a(class = "modal-overlay", `aria-label`="Close"):
@@ -2252,10 +2361,11 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                 label(class = "form-label", `for` = "settings-ts"): text state.lang.timeScale
               tdiv(class = "col-9 col-sm-12"):
                 ul(class = "step", id = "timesteps"):
-                  for t in timeSteps:
-                    li(class = cstring class({"active": not state.engine.isNil and state.engine.timing.timeScale.to(float) == timeScale * t},
-                      "step-item")):
-                      a(href = "#", text &"{t}×", onclick = onClickStep(t))
+                  if state.startedRendering:
+                    for e, t in timeSteps:
+                      li(class = cstring class("step-item", {"active": not state.engine.isNil and 
+                          state.engine.timing.timeScale.to(float) == timeScale * t})):
+                        a(href = "#", text &"{t}×", onclick = onClickStep(e, t))
 
             tdiv(class = "form-group"): 
               tdiv(class = "col-3 col-sm-12"):
@@ -2270,13 +2380,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   proc onchange(e: Event, n: VNode) = 
                     var i = 0
                     discard parseInt($n.value, i)
-                    state.lang = Locale(i)
-                    if not kxi.surpressRedraws: redraw(kxi)
-                    discard setTimeout(proc() = 
-                      state.updateFormulaAccordion()
-                      state.updateStateAccordion()
-                      state.updatePointAccordion()
-                    , 100)
+                    state.changeLang(Locale(i))
 
             tdiv(class = "form-group"): 
               label(class = "form-switch"):
@@ -2284,6 +2388,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   checked = true):
                   proc onchange(ev: Event, n: VNode) = 
                     state.canon.showVArrow = n.dom.checked
+                    window.localStorage.setItem("showVArrow", cstring $n.dom.checked)
 
                 italic(class = "form-icon")
                 text state.lang.showVArrow
@@ -2294,6 +2399,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   checked = true):
                   proc onchange(ev: Event, n: VNode) = 
                     state.canon.showVxArrow = n.dom.checked
+                    window.localStorage.setItem("showVxArrow", cstring $n.dom.checked)
 
                 italic(class = "form-icon")
                 text state.lang.showVxArrow
@@ -2304,6 +2410,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   checked = true):
                   proc onchange(ev: Event, n: VNode) = 
                     state.canon.showVyArrow = n.dom.checked
+                    window.localStorage.setItem("showVyArrow", cstring $n.dom.checked)
 
                 italic(class = "form-icon")
                 text state.lang.showVyArrow
@@ -2314,6 +2421,8 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   checked = true):
                   proc onchange(ev: Event, n: VNode) = 
                     state.showFormulaResults = n.dom.checked
+                    window.localStorage.setItem("formulaResults", cstring $n.dom.checked)
+
                     state.updateFormulaAccordion()
                     state.updatePointAccordion()
                     state.updateStateAccordion()
@@ -2327,6 +2436,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   checked = false):
                   proc onchange(ev: Event, n: VNode) = 
                     toggleStarsAnimation(n.dom.checked)
+                    window.localStorage.setItem("starsAnimation", cstring $n.dom.checked)
 
                 italic(class = "form-icon")
                 text state.lang.starsAnimation
@@ -2337,12 +2447,12 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   text state.lang.bulletsLimit
               tdiv(class = "col-9 col-sm-12 tooltip tooltip-left", `data-tooltip` = cstring $state.canon.bulletsLimit):
                 input(class = "slider", `type` = "range", id = "settings-bl", 
-                  min = "1", max = "50", value = cstring $state.canon.bulletsLimit, step = "1"):
+                  min = $bulletsLimitRange.a, max = $bulletsLimitRange.b, value = cstring $state.canon.bulletsLimit, step = "1"):
                   proc onchange(e: Event, n: VNode) = 
                     var v = 0
                     discard parseInt($n.value, v)
-                    state.canon.bulletsLimit = clamp(v, 1, 50)
-                    n.dom.setAttr("value", n.value)
+                    state.changeBulletsLimit(v, n.dom)
+                    window.localStorage.setItem("bulletsLimit", cstring $state.canon.bulletsLimit)
 
                   proc oninput(e: Event, n: VNode) = 
                     n.dom.parentElement.setAttr("data-tooltip", n.value)

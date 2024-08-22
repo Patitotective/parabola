@@ -9,8 +9,8 @@ i18nInit Locale, true:
     English = "Pluto"
     Spanish = "Plutón"
   moon:
-    English = "Moon"
-    Spanish = "Luna"
+    English = "The Moon"
+    Spanish = "La Luna"
   mercAndMars:
     English = "Mercury & Mars"
     Spanish = "Mercurio & Marte"
