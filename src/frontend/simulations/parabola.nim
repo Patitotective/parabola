@@ -77,6 +77,7 @@ type
 
     canon*: Canon
     ground*: JsObject
+    blocks*: seq[JsObject]
 
     trajectories*: seq[Trajectory]
     currentTrajectory*: int
@@ -89,6 +90,7 @@ type
     floatPrecision*: range[0..8]
     startedRendering*: bool
     showFormulaResults*: bool
+    studentMode*: bool
 
     lang*: Locale
 
@@ -189,6 +191,7 @@ const
   hiddenFormulaVal = "__"
 
   bulletsLimitRange = 1..100
+  studentModePasswordRange = 8..20
 
 let
   formulaAccordionBodyStyle = "padding-left: 0.5em; overflow: auto; scrollbar-width: thin;".toCss
@@ -1482,6 +1485,7 @@ proc changeLang(state: var ParabolaState, lang: Locale) =
   window.localStorage.setItem("lang", cstring $lang.int)
 
   if not kxi.surpressRedraws: redraw(kxi)
+  # Because if we do it straight away it won't change the tooltips properly
   discard setTimeout(proc() = 
     state.updateFormulaAccordion()
     state.updateStateAccordion()
@@ -1504,20 +1508,13 @@ proc changeBulletsLimit(state: var ParabolaState, bulletsLimit: int, slider: Nod
       if (let a = state.canon.flyingBullets.find(i); a >= 0):
         state.canon.flyingBullets.delete(a)
 
+proc changeBlocksCollision(state: ParabolaState, to: bool) = 
+  for b in state.blocks:
+    b.collisionFilter.category = 
+      if to: 2
+      else: 1
+
 proc loadSettings(state: var ParabolaState) = 
-  if (let v = window.localStorage.getItem("lang"); not v.isNil):
-    var i = 0
-    discard parseInt($v, i)
-    if i in Locale.low.int..Locale.high.int:
-      state.changeLang(Locale(i))
-
-  getElementById("langSelect").value = cstring $state.lang.int
-
-  if (let v = window.localStorage.getItem("timescale"); not v.isNil):
-    var i = 0
-    discard parseInt($v, i)
-    state.engine.timing.timeScale = timeScale * timeSteps[i]
-
   if (let v = window.localStorage.getItem("starsAnimation"); not v.isNil):
     var b = false
     try:
@@ -1529,7 +1526,7 @@ proc loadSettings(state: var ParabolaState) =
     getElementById("settings-sa").checked = b
   else:
     toggleStarsAnimation(false)
-
+  
   if (let v = window.localStorage.getItem("showVArrow"); not v.isNil):
     var b = true
     try:
@@ -1569,10 +1566,36 @@ proc loadSettings(state: var ParabolaState) =
       state.showFormulaResults = b
       getElementById("settings-er").checked = b
 
+  if (let v = window.localStorage.getItem("timescale"); not v.isNil):
+    var i = 0
+    discard parseInt($v, i)
+    state.engine.timing.timeScale = timeScale * timeSteps[i]
+
   if (let v = window.localStorage.getItem("bulletsLimit"); not v.isNil):
     var i = 0
     discard parseInt($v, i)
     state.changeBulletsLimit(i, getElementById("settings-bl").Node)
+
+  if (let v = window.localStorage.getItem("collideWithBlocks"); not v.isNil):
+      var b = true
+      try:
+        b = parseBool($v)
+      except ValueError:
+        discard
+
+      state.changeBlocksCollision(b)
+      getElementById("settings-cwb").checked = b
+
+  if (let v = window.localStorage.getItem("lang"); not v.isNil):
+    var i = 0
+    discard parseInt($v, i)
+    if i in Locale.low.int..Locale.high.int:
+      state.lang = Locale(i)
+  
+    # To update the language change
+    if not kxi.surpressRedraws: redraw(kxi)
+
+  getElementById("langSelect").value = cstring $state.lang.int
 
 ## Loads the simulation
 proc load*(state: var ParabolaState) =
@@ -1644,26 +1667,24 @@ proc load*(state: var ParabolaState) =
   state.ground.xratio = 0.5
   state.ground.yratio = 1
 
-  let block1 = Matter.Bodies.rectangle(70, 
-    state.canvasSize.y * 0.8, 60, 35, 
-    JsObject{zIndex: 0, isStatic: false, label: cstring"Block 1", frictionAir: 0.1, 
-      friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
-      collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
-  })
-
-  let block2 = Matter.Bodies.rectangle(70, 
-    state.canvasSize.y * 0.7, 40, 55, 
-    JsObject{zIndex: 0, isStatic: false, label: cstring"Block 2", frictionAir: 0.1, 
-      friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
-      collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
-  })
-
-  let block3 = Matter.Bodies.rectangle(70, 
-    state.canvasSize.y * 0.6, 20, 30, 
-    JsObject{zIndex: 0, isStatic: false, label: cstring"Block 3", frictionAir: 0.1, 
-      friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
-      collisionFilter: JsObject{category: 1, mask: 3}, sleepThreshold: 1,
-  })
+  state.blocks = @[Matter.Bodies.rectangle(70, 
+      state.canvasSize.y * 0.8, 60, 35, 
+      JsObject{zIndex: 0, isStatic: false, label: cstring"Block 1", frictionAir: 0.1, 
+        friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
+        collisionFilter: JsObject{category: 2, mask: 3}, sleepThreshold: 1,
+    }),
+    Matter.Bodies.rectangle(70, 
+      state.canvasSize.y * 0.7, 40, 55, 
+      JsObject{zIndex: 0, isStatic: false, label: cstring"Block 2", frictionAir: 0.1, 
+        friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
+        collisionFilter: JsObject{category: 2, mask: 3}, sleepThreshold: 1,
+    }),
+    Matter.Bodies.rectangle(70, 
+      state.canvasSize.y * 0.6, 20, 30, 
+      JsObject{zIndex: 0, isStatic: false, label: cstring"Block 3", frictionAir: 0.1, 
+        friction: 1, frictionStatic: 1, plugin: JsObject{wrap: state.wrapObject}, 
+        collisionFilter: JsObject{category: 2, mask: 3}, sleepThreshold: 1,
+    })]
 
   state.mouse = Matter.Mouse.create(state.canvas)
   state.render.mouse = state.mouse
@@ -1682,7 +1703,7 @@ proc load*(state: var ParabolaState) =
 
   Matter.Composite.add(state.engine.world, toJs [
     state.canon.body, state.mouseCons,
-    block1, block2, block3, state.canon.base.body,
+    state.canon.base.body,
     state.canon.platform.body,
     # Walls
     roof, # up
@@ -1690,6 +1711,7 @@ proc load*(state: var ParabolaState) =
     state.ground, # down
     # Matter.Bodies.rectangle(10, 250, 20, 500, JsObject{isStatic: true}), # left
   ])
+  Matter.Composite.add(state.engine.world, toJs state.blocks)
 
   state.loadSettings()
 
@@ -2335,6 +2357,66 @@ proc renderHelpModal(state: var ParabolaState): VNode =
         a(href = cstring config.website): text "GitHub"
         text "."
 
+proc renderStudentModeModal(state: var ParabolaState): VNode = 
+  buildHtml tdiv(class = "modal", id = "student-mode-modal"):
+    a(class = "modal-overlay", `aria-label`="Close"):
+      proc onclick() = 
+        getElementById("student-mode-modal").classList.remove("active")
+        getElementById("settings-stm").checked = false
+        state.studentMode = false
+
+    tdiv(class = "modal-container"):
+      tdiv(class = "modal-header"):
+        a(class = "btn btn-clear float-right", `aria-label`="Close"):
+          proc onclick() = 
+            getElementById("student-mode-modal").classList.remove("active")
+            getElementById("settings-stm").checked = false
+            state.studentMode = false
+
+        tdiv(class = "modal-title h5"): text state.lang.studentMode
+
+      tdiv(class = "modal-body", style = toCss "padding-top: 0;"):
+        tdiv(class = "content", style = toCss "margin-top: 0.8rem;"):
+          p: text state.lang.studentModeExplaination
+          #br()
+          input(class = "form-input is-error", placeholder = cstring state.lang.password, 
+            `type` = "password", id = "student-mode-modal-input", required = true,
+            minlength = cstring $studentModePasswordRange.a, maxlength = cstring $studentModePasswordRange.b):
+            proc oninput(e: Event, n: VNode) = 
+              let ele = Element n.dom
+              let value = $ele.value
+              if value.len < studentModePasswordRange.a:
+                getElementById("student-mode-modal-input-hint").innerText = 
+                  cstring state.lang.tooShortPassword
+                ele.classList.add("is-error")
+              elif value.len > studentModePasswordRange.b:
+                getElementById("student-mode-modal-input-hint").innerText = 
+                  cstring state.lang.tooLongPassword
+                ele.classList.add("is-error")
+              else:
+                getElementById("student-mode-modal-input-hint").innerText = ""
+                ele.classList.remove("is-error")
+                ele.classList.add("is-success")
+
+              if value.len > 0 and value[0] in Whitespace or value[^1] in Whitespace:
+                ele.value = cstring value.strip()
+
+          p(class = "form-input-hint", id = "student-mode-modal-input-hint")
+          #br()
+          p: text state.lang.studentModeExplaination2
+          #br()
+          button(class = "btn btn-primary", id = "student-mode-modal-button", 
+            `type` = "button"):
+            text state.lang.changeMode
+            proc onclick() = 
+              let inp = getElementById("student-mode-modal-input")
+              let value = $inp.value
+              if "is-success" notin inp.classList or 
+                value.len notin studentModePasswordRange: return
+
+              echo "popo"
+
+
 proc renderSettingsModal(state: var ParabolaState): VNode = 
   proc onClickStep(index: int, t: float): auto = 
     proc(e: Event, n: VNode) = 
@@ -2443,6 +2525,17 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                 italic(class = "form-icon")
                 text state.lang.starsAnimation
 
+            tdiv(class = "form-group tooltip", `data-tooltip` = cstring state.lang.collideWithBlocksTooltip): 
+              label(class = "form-switch"):
+                input(`type` = "checkbox", id = "settings-cwb", 
+                  checked = true):
+                  proc onchange(ev: Event, n: VNode) = 
+                    state.changeBlocksCollision(n.dom.checked)
+                    window.localStorage.setItem("collideWithBlocks", cstring $n.dom.checked)
+
+                italic(class = "form-icon")
+                text state.lang.collideWithBlocks
+
             tdiv(class = "form-group"): 
               tdiv(class = "col-3 col-sm-12"):
                 label(class = "form-label", `for` = "settings-bl"):
@@ -2459,10 +2552,29 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   proc oninput(e: Event, n: VNode) = 
                     n.dom.parentElement.setAttr("data-tooltip", n.value)
 
+            tdiv(class = cstring class("form-group", {"has-error": state.studentMode})): 
+              label(class = "form-switch"):
+                input(`type` = "checkbox", id = "settings-stm", 
+                  checked = false):
+                  proc onchange(ev: Event, n: VNode) = 
+                    if not state.studentMode:
+                      state.studentMode = true
+                      getElementById("student-mode-modal").classList.add("active")
+                    #else:
+                    #state.studentMode = not state.studentMode
+
+                italic(class = "form-icon")
+                if state.studentMode:
+                  text state.lang.studentMode
+                else:
+                  text state.lang.teacherMode
+
       tdiv(class = "modal-footer"):
         text state.lang.aboutMsg("v", config.version)
         a(href = cstring config.website): text "GitHub"
         text "."
+
+    state.renderStudentModeModal()
 
 proc renderButtons(state: var ParabolaState): VNode = 
   buildHtml tdiv(class = "btn-group btn-group-block", style = toCss "margin-left: 1rem; margin-right: 1rem;"):

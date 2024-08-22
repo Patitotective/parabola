@@ -13,7 +13,7 @@ nimble install -d -y
 nimble htmlpage
 ```
 
-## Post processing
+## Optional Post processing
 1. Babel Formatter with https://codifyformatter.org/babel-formatter.
 2. JS Minifier with https://www.toptal.com/developers/javascript-minifier.
 

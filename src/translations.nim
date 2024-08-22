@@ -13,7 +13,7 @@ i18nInit Locale, true:
     Spanish = "La Luna"
   mercAndMars:
     English = "Mercury & Mars"
-    Spanish = "Mercurio & Marte"
+    Spanish = "Mercurio Y Marte"
   uranus:
     English = "Uranus"
     Spanish = "Urano"
@@ -182,3 +182,33 @@ i18nInit Locale, true:
   fireTooltip:
     English = "Press space or middle-click"
     Spanish = "Presiona espacio o\nda clic con la rueda"
+  studentMode:
+    English = "Student Mode"
+    Spanish = "Modo Estudiante"
+  teacherMode:
+    English = "Teacher Mode"
+    Spanish = "Modo Profesor"
+  studentModeExplaination:
+    English = "In Student Mode you will not be able to modify the settings without switching back to Teacher Mode. To switch back to Teacher Mode you will need the password you will enter now:"
+    Spanish = "En el Modo Estudiante no vas a poder cambiar la configuración sin volver al Modo Profesor. Para volver al Modo Profesor necesitarás la contraseña que vas a ingresar ahora:"
+  studentModeExplaination2:
+    English = "This is useful if you don't want your students to change the settings to see the solutions or the procedure for the equations if you lend them your computer."
+    Spanish = "Esto es útil si no quieres que tus estudiantes cambien la configuración para ver las soluciones o el procedimiento de las equaciones si les prestas tu computador."
+  collideWithBlocks:
+    English = "Collide with blocks in flight"
+    Spanish = "Colisionar con los bloques en vuelo"
+  collideWithBlocksTooltip:
+    English = "Enable bullet collision with the blocks\nwhile the bullets flying"
+    Spanish = "Permitir que las balas colisionen con los\nbloques cuando las balas estén en el aire"
+  password:
+    English = "Password"
+    Spanish = "Contraseña"
+  changeMode:
+    English = "Change Mode"
+    Spanish = "Cambiar Modo"
+  tooShortPassword:
+    English = "The password is too short"
+    Spanish = "La constraseña es muy corta"
+  tooLongPassword:
+    English = "The password is too long"
+    Spanish = "La constraseña es muy larga"
