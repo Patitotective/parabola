@@ -1527,6 +1527,8 @@ proc loadSettings(state: var ParabolaState) =
     
     toggleStarsAnimation(b)
     getElementById("settings-sa").checked = b
+  else:
+    toggleStarsAnimation(false)
 
   if (let v = window.localStorage.getItem("showVArrow"); not v.isNil):
     var b = true
@@ -2447,7 +2449,7 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   text state.lang.bulletsLimit
               tdiv(class = "col-9 col-sm-12 tooltip tooltip-left", `data-tooltip` = cstring $state.canon.bulletsLimit):
                 input(class = "slider", `type` = "range", id = "settings-bl", 
-                  min = $bulletsLimitRange.a, max = $bulletsLimitRange.b, value = cstring $state.canon.bulletsLimit, step = "1"):
+                  min = cstring $bulletsLimitRange.a, max = cstring $bulletsLimitRange.b, value = cstring $state.canon.bulletsLimit, step = "1"):
                   proc onchange(e: Event, n: VNode) = 
                     var v = 0
                     discard parseInt($n.value, v)
