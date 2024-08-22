@@ -3,15 +3,13 @@ This website implements a projectile motion simulation.
 
 ## Features
 - Physics with `matter-js`.
-- Equations with `MathJax`.
-
-## Files
-- `dist_en`: The website with English as the default language.
-- `dist_es`: The website with Spanish as the default language.
+- Equations with `KaTex`.
 
 ## Building
 To build the html page, run:
 ```
+git submodule update --init
+nimble install -d -y
 nimble htmlpage
 ```
 
