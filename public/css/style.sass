@@ -23,6 +23,12 @@ body
 .disabledChild
 	pointer-events: none
 
+#teacher-modal-input-hint, #student-modal-input-hint
+	margin-bottom: 0.9rem
+
+.btn-action.tooltip:focus:not(:hover)::after
+	opacity: 0 !important
+
 // n is number of stars required
 @function multiple-box-shadow ($n) 
   $value: "#{random(2000)}px #{random(2000)}px #FFF"

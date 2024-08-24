@@ -4076,6 +4076,12 @@ body {
 .disabledChild {
   pointer-events: none; }
 
+#teacher-modal-input-hint, #student-modal-input-hint {
+  margin-bottom: 0.9rem; }
+
+.btn-action.tooltip:focus:not(:hover)::after {
+  opacity: 0 !important; }
+
 #stars {
   width: 1px;
   height: 1px;

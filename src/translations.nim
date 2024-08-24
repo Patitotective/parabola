@@ -157,8 +157,8 @@ i18nInit Locale, true:
     English = "You can fire a bullet by pressing the wheel on your mouse, pressing with three fingers in your touchpad or by pressing the spacebar."
     Spanish = "Puedes disparar una bala presionando la rueda del mouse, presionando con tres dedos en el touchpad o presionando la barra espaciadora."
   help7:
-    English = "You can add a new trajectory by pressing the enter key."
-    Spanish = "Puedes añadir una trayectoria nueva presionando la tecla enter."
+    English = "You can add a new trajectory by pressing the enter key and you can remove a trajectory by double-clicking its button."
+    Spanish = "Puedes añadir una trayectoria nueva presionando la tecla enter y puedes quitar una trayectoria dando doble clic en su botón."
   help8:
     English = "You can grab any bullet or rectangle and move it around the screen."
     Spanish = "Puedes agarrar cualquier bala o rectángulo y moverlo alrededor de la pantalla."
@@ -195,11 +195,11 @@ i18nInit Locale, true:
     English = "Switch to Teacher Mode"
     Spanish = "Cambiar a Modo Profesor"
   studentModeExplaination:
-    English = "In Student Mode you will not be able to modify the settings without switching back to Teacher Mode. To switch back to Teacher Mode you will need the password you will enter now:"
-    Spanish = "En el Modo Estudiante no vas a poder cambiar la configuración sin volver al Modo Profesor. Para volver al Modo Profesor necesitarás la contraseña que vas a ingresar ahora:"
+    English = "In Student Mode you will not be able to modify the settings. To switch back to Teacher Mode you will need the password you will enter now:"
+    Spanish = "En el Modo Estudiante no vas a poder cambiar la configuración. Para volver al Modo Profesor necesitarás la contraseña que vas a ingresar ahora:"
   studentModeExplaination2:
-    English = "This is useful if you don't want your students to change the settings to see the solutions or the procedure for the equations if you lend them your computer."
-    Spanish = "Esto es útil si no quieres que tus estudiantes cambien la configuración para ver las soluciones o el procedimiento de las equaciones si les prestas tu computador."
+    English = "This is useful if you don't want your students to see the solutions or the procedures for the equations if you lend them your computer."
+    Spanish = "Esto es útil si no quieres que tus estudiantes vean las soluciones o los procedimientos de las equaciones si les prestas tu computador."
   collideWithBlocks:
     English = "Collide with blocks in flight"
     Spanish = "Colisionar con los bloques en vuelo"
@@ -220,7 +220,7 @@ i18nInit Locale, true:
     Spanish = "Para volver al Modo Profesor necesitas ingresar la contraseña que fue ingresada cuando se cambió al Modo Estudiante."
   showFormulaProc:
     English = "Show equations' procedures"
-    Spanish = "Mostar el procedimiento de las equaciones"
+    Spanish = "Mostar los procedimientos de las equaciones"
   wrongPassword:
     English = "Wrong password"
     Spanish = "Contraseña incorrecta"

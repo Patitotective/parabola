@@ -2431,71 +2431,80 @@ proc renderHelpModal(state: var ParabolaState): VNode =
         text "."
 
 proc renderTeacherModeModal(state: var ParabolaState): VNode = 
-  buildHtml tdiv(class = "modal", id = "teacher-mode-modal"):
+  buildHtml tdiv(class = "modal", id = "teacher-modal"):
     a(class = "modal-overlay", `aria-label`="Close"):
       proc onclick() = 
-        getElementById("teacher-mode-modal").classList.remove("active")
+        getElementById("teacher-modal").classList.remove("active")
         getElementById("settings-stm").checked = true
+        getElementById("teacher-modal-input").value = ""
+        getElementById("teacher-modal-content").classList.add("has-error")
 
     tdiv(class = "modal-container"):
       tdiv(class = "modal-header"):
         a(class = "btn btn-clear float-right", `aria-label`="Close"):
           proc onclick() = 
-            getElementById("teacher-mode-modal").classList.remove("active")
+            getElementById("teacher-modal").classList.remove("active")
             getElementById("settings-stm").checked = true
+            getElementById("teacher-modal-input").value = ""
+            getElementById("teacher-modal-content").classList.add("has-error")
 
         tdiv(class = "modal-title h5"): text state.lang.switchToTeacherMode
 
       tdiv(class = "modal-body"):
-        tdiv(class = "content"):
+        tdiv(class = "content has-error", id = "teacher-modal-content"):
           p: text state.lang.teacherModeExplaination
+          
           tdiv(class = "columns", style = toCss "align-items: center;"):
-            tdiv(class = "column col-11"):
-              input(class = "form-input is-error", placeholder = cstring state.lang.password, 
-                `type` = "password", id = "teacher-mode-modal-input", required = true,
-                minlength = cstring $passwordRange.a, maxlength = cstring $passwordRange.b):
-                proc oninput(e: Event, n: VNode) = 
-                  let ele = Element n.dom
-                  let value = $ele.value
-                  if value.len < passwordRange.a:
-                    getElementById("teacher-mode-modal-input-hint").innerText = 
-                      cstring state.lang.tooShortPassword
-                    ele.classList.add("is-error")
-                  elif value.len > passwordRange.b:
-                    getElementById("teacher-mode-modal-input-hint").innerText = 
-                      cstring state.lang.tooLongPassword
-                    ele.classList.add("is-error")
-                  else:
-                    getElementById("teacher-mode-modal-input-hint").innerText = ""
-                    ele.classList.remove("is-error")
-                    ele.classList.add("is-success")
+              tdiv(class = "column col-11"):
+                input(class = "form-input", placeholder = cstring state.lang.password, 
+                  `type` = "password", id = "teacher-modal-input", required = true,
+                  minlength = cstring $passwordRange.a, maxlength = cstring $(passwordRange.b + 2)):
+                  proc oninput(e: Event, n: VNode) = 
+                    let ele = Element n.dom
+                    let value = $ele.value
+                    let inputHint = getElementById("teacher-modal-input-hint")
+                    let content = getElementById("teacher-modal-content")
+                    if value.len < passwordRange.a:
+                      content.classList.add("has-error")
+                      inputHint.style.setProperty("visibility", "visible")
+                      inputHint.innerText = 
+                        cstring state.lang.tooShortPassword
+                    elif value.len > passwordRange.b:
+                      content.classList.add("has-error")
+                      inputHint.style.setProperty("visibility", "visible")
+                      inputHint.innerText = 
+                        cstring state.lang.tooLongPassword
+                    else:
+                      content.classList.remove("has-error")
+                      content.classList.add("has-success")
+                      inputHint.style.setProperty("visibility", "hidden")
 
-                  if value.len > 0:
-                    if value[0] in Whitespace or value[^1] in Whitespace:
-                      ele.value = cstring value.strip()
+                    if value.len > 0:
+                      if value[0] in Whitespace or value[^1] in Whitespace:
+                        ele.value = cstring value.strip()
 
-            tdiv(class = "column col-1"):
-              button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
-                span(class = "material-symbols-outlined"): text "visibility"
-                proc onclick(e: Event, n: VNode) = 
-                  let ele = getElementById("teacher-mode-modal-input").toJs
-                  if n.dom.firstChild.innerText == "visibility":
-                     n.dom.firstChild.innerText = "visibility_off"
-                     ele.`type` = cstring"text"
-                  else:
-                     n.dom.firstChild.innerText = "visibility"
-                     ele.`type` = cstring"password"
+              tdiv(class = "column col-1"):
+                button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
+                  span(class = "material-symbols-outlined"): text "visibility"
+                  proc onclick(e: Event, n: VNode) = 
+                    let ele = getElementById("teacher-modal-input").toJs
+                    if n.dom.firstChild.innerText == "visibility":
+                       n.dom.firstChild.innerText = "visibility_off"
+                       ele.`type` = cstring"text"
+                    else:
+                       n.dom.firstChild.innerText = "visibility"
+                       ele.`type` = cstring"password"
 
-          p(class = "form-input-hint", id = "teacher-mode-modal-input-hint")
+          p(class = "form-input-hint", id = "teacher-modal-input-hint"):
+            text "example hint"
 
-          button(class = "btn btn-primary", id = "teacher-mode-modal-button", 
+          button(class = "btn btn-primary", id = "teacher-modal-button", 
             `type` = "button"):
             text state.lang.switchToTeacherMode
             proc onclick() = 
-              let inp = getElementById("teacher-mode-modal-input")
+              let inp = getElementById("teacher-modal-input")
               let value = $inp.value
-              if "is-success" notin inp.classList or 
-                value.len notin passwordRange: return
+              if value.len notin passwordRange: return
 
               var newP = newSeq[byte]()
               for i in value.encode:
@@ -2503,52 +2512,64 @@ proc renderTeacherModeModal(state: var ParabolaState): VNode =
 
               if newP == state.lastUsed:
                 inp.value = ""
-                getElementById("teacher-mode-modal").classList.remove("active")
+                getElementById("teacher-modal").classList.remove("active")
                 state.studentMode = false
                 window.localStorage.setItem("lastUsed", "")
               else:
-                getElementById("teacher-mode-modal-input-hint").innerText = 
+                let inputHint = getElementById("teacher-modal-input-hint")
+                inputHint.style.setProperty("visibility", "visible")
+                inputHint.innerText = 
                   state.lang.wrongPassword
 
+              getElementById("teacher-modal-content").classList.add("has-error")
+
 proc renderStudentModeModal(state: var ParabolaState): VNode = 
-  buildHtml tdiv(class = "modal", id = "student-mode-modal"):
+  buildHtml tdiv(class = "modal", id = "student-modal"):
     a(class = "modal-overlay", `aria-label`="Close"):
       proc onclick() = 
-        getElementById("student-mode-modal").classList.remove("active")
+        getElementById("student-modal").classList.remove("active")
         getElementById("settings-stm").checked = false
+        getElementById("student-modal-input").value = ""
+        getElementById("student-modal-content").classList.add("has-error")
 
     tdiv(class = "modal-container"):
       tdiv(class = "modal-header"):
         a(class = "btn btn-clear float-right", `aria-label`="Close"):
           proc onclick() = 
-            getElementById("student-mode-modal").classList.remove("active")
+            getElementById("student-modal").classList.remove("active")
             getElementById("settings-stm").checked = false
+            getElementById("student-modal-input").value = ""
+            getElementById("student-modal-content").classList.add("has-error")
 
         tdiv(class = "modal-title h5"): text state.lang.switchToStudentMode
 
       tdiv(class = "modal-body"):
-        tdiv(class = "content"):
+        tdiv(class = "content has-error", id = "student-modal-content"):
           p: text state.lang.studentModeExplaination
           tdiv(class = "columns", style = toCss "align-items: center;"):
             tdiv(class = "column col-11"):
-              input(class = "form-input is-error", placeholder = cstring state.lang.password, 
-                `type` = "password", id = "student-mode-modal-input", required = true,
-                minlength = cstring $passwordRange.a, maxlength = cstring $passwordRange.b):
+              input(class = "form-input", placeholder = cstring state.lang.password, 
+                `type` = "password", id = "student-modal-input", required = true,
+                minlength = cstring $passwordRange.a, maxlength = cstring $(passwordRange.b + 2)):
                 proc oninput(e: Event, n: VNode) = 
                   let ele = Element n.dom
                   let value = $ele.value
+                  let inputHint = getElementById("student-modal-input-hint")
+                  let content = getElementById("student-modal-content")
                   if value.len < passwordRange.a:
-                    getElementById("student-mode-modal-input-hint").innerText = 
+                    content.classList.add("has-error")
+                    inputHint.style.setProperty("visibility", "visible")
+                    inputHint.innerText = 
                       cstring state.lang.tooShortPassword
-                    ele.classList.add("is-error")
                   elif value.len > passwordRange.b:
-                    getElementById("student-mode-modal-input-hint").innerText = 
+                    content.classList.add("has-error")
+                    inputHint.style.setProperty("visibility", "visible")
+                    inputHint.innerText = 
                       cstring state.lang.tooLongPassword
-                    ele.classList.add("is-error")
                   else:
-                    getElementById("student-mode-modal-input-hint").innerText = ""
-                    ele.classList.remove("is-error")
-                    ele.classList.add("is-success")
+                    content.classList.remove("has-error")
+                    content.classList.add("has-success")
+                    inputHint.style.setProperty("visibility", "hidden")
 
                   if value.len > 0:
                     if value[0] in Whitespace or value[^1] in Whitespace:
@@ -2558,7 +2579,7 @@ proc renderStudentModeModal(state: var ParabolaState): VNode =
               button(class = "btn btn-action btn-sm", style = toCss "border: none;"):
                 span(class = "material-symbols-outlined"): text "visibility"
                 proc onclick(e: Event, n: VNode) = 
-                  let ele = getElementById("student-mode-modal-input").toJs
+                  let ele = getElementById("student-modal-input").toJs
                   if n.dom.firstChild.innerText == "visibility":
                      n.dom.firstChild.innerText = "visibility_off"
                      ele.`type` = cstring"text"
@@ -2566,16 +2587,17 @@ proc renderStudentModeModal(state: var ParabolaState): VNode =
                      n.dom.firstChild.innerText = "visibility"
                      ele.`type` = cstring"password"
 
-          p(class = "form-input-hint", id = "student-mode-modal-input-hint")
+          p(class = "form-input-hint", id = "student-modal-input-hint"): 
+            text "example hint"
+
           p: text state.lang.studentModeExplaination2
-          button(class = "btn btn-primary", id = "student-mode-modal-button", 
+          button(class = "btn btn-primary", id = "student-modal-button", 
             `type` = "button"):
             text state.lang.switchToStudentMode
             proc onclick() = 
-              let inp = getElementById("student-mode-modal-input")
+              let inp = getElementById("student-modal-input")
               let value = $inp.value
-              if "is-success" notin inp.classList or 
-                value.len notin passwordRange: return
+              if value.len notin passwordRange: return
 
               inp.value = ""
 
@@ -2585,7 +2607,8 @@ proc renderStudentModeModal(state: var ParabolaState): VNode =
 
               window.localStorage.setItem("lastUsed", cstring state.lastUsed.join("."))
 
-              getElementById("student-mode-modal").classList.remove("active")
+              getElementById("student-modal").classList.remove("active")
+              getElementById("student-modal-content").classList.add("has-error")
               state.studentMode = true
 
 proc elementHasClass(ele, class: string): bool = 
@@ -2753,17 +2776,19 @@ proc renderSettingsModal(state: var ParabolaState): VNode =
                   proc oninput(e: Event, n: VNode) = 
                     n.dom.parentElement.setAttr("data-tooltip", n.value)
 
-            let showStudentMode = elementHasClass("student-mode-modal", "active") or 
-              (state.studentMode and not elementHasClass("teacher-mode-modal", "active"))
+            let showStudentMode = elementHasClass("student-modal", "active") or 
+              (state.studentMode and not elementHasClass("teacher-modal", "active"))
             tdiv(class = class("form-group", {"has-error": showStudentMode})): 
               label(class = "form-switch"):
                 input(`type` = "checkbox", id = "settings-stm", autocomplete = "off",
                   checked = false):
                   proc onchange(ev: Event, n: VNode) = 
                     if state.studentMode:
-                      getElementById("teacher-mode-modal").classList.add("active")
+                      getElementById("teacher-modal").classList.add("active")
+                      getElementById("teacher-modal-input-hint").style.setProperty("visibility", "hidden")
                     else:
-                      getElementById("student-mode-modal").classList.add("active")
+                      getElementById("student-modal").classList.add("active")
+                      getElementById("student-modal-input-hint").style.setProperty("visibility", "hidden")
 
                 italic(class = "form-icon")
                 if showStudentMode:
