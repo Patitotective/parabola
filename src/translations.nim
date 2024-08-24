@@ -130,8 +130,8 @@ i18nInit Locale, true:
     English = "Animate background stars"
     Spanish = "Animar las estrellas de fondo"
   aboutMsg:
-    English = "$v. Made by Patitotective. Source code in "
-    Spanish = "Hecho por Patitotective. Código fuente en "
+    English = "v$v Made by Patitotective. Source code in "
+    Spanish = "v$v Hecho por Patitotective. Código fuente en "
   animationWarning:
     English = "Has a high impact in the performance"
     Spanish = "Tiene un alto impacto en el rendimiento"
@@ -170,8 +170,8 @@ i18nInit Locale, true:
     Spanish = "Recuerda que todos los valores están redondeados a dos decimales."
 
   helpFooter:
-    English = "v$v. Feel free to ask more questions or report bugs in "
-    Spanish = "v$v. Si tienes más preguntas o quieres reportar un problema visita "
+    English = "v$v Feel free to ask more questions or report bugs in "
+    Spanish = "v$v Si tienes más preguntas o quieres reportar un problema visita "
 
   togglePauseTooltip:
     English = "Press P"
