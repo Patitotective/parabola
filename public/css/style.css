@@ -4069,6 +4069,13 @@ body {
 .form-radio {
   min-height: 0.7rem !important; }
 
+.disabledParent {
+  opacity: 0.6;
+  cursor: not-allowed; }
+
+.disabledChild {
+  pointer-events: none; }
+
 #stars {
   width: 1px;
   height: 1px;

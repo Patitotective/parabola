@@ -188,6 +188,12 @@ i18nInit Locale, true:
   teacherMode:
     English = "Teacher Mode"
     Spanish = "Modo Profesor"
+  switchToStudentMode:
+    English = "Switch to Student Mode"
+    Spanish = "Cambiar a Modo Estudiante"
+  switchToTeacherMode:
+    English = "Switch to Teacher Mode"
+    Spanish = "Cambiar a Modo Profesor"
   studentModeExplaination:
     English = "In Student Mode you will not be able to modify the settings without switching back to Teacher Mode. To switch back to Teacher Mode you will need the password you will enter now:"
     Spanish = "En el Modo Estudiante no vas a poder cambiar la configuración sin volver al Modo Profesor. Para volver al Modo Profesor necesitarás la contraseña que vas a ingresar ahora:"
@@ -198,17 +204,23 @@ i18nInit Locale, true:
     English = "Collide with blocks in flight"
     Spanish = "Colisionar con los bloques en vuelo"
   collideWithBlocksTooltip:
-    English = "Enable bullet collision with the blocks\nwhile the bullets flying"
+    English = "Enable bullet collision with the blocks\nwhile the bullets are flying"
     Spanish = "Permitir que las balas colisionen con los\nbloques cuando las balas estén en el aire"
   password:
     English = "Password"
     Spanish = "Contraseña"
-  changeMode:
-    English = "Change Mode"
-    Spanish = "Cambiar Modo"
   tooShortPassword:
     English = "The password is too short"
     Spanish = "La constraseña es muy corta"
   tooLongPassword:
     English = "The password is too long"
     Spanish = "La constraseña es muy larga"
+  teacherModeExplaination:
+    English = "To switch back to Teacher Mode you will have to enter the password that was set when switching to Student Mode."
+    Spanish = "Para volver al Modo Profesor necesitas ingresar la contraseña que fue ingresada cuando se cambió al Modo Estudiante."
+  showFormulaProc:
+    English = "Show equations' procedures"
+    Spanish = "Mostar el procedimiento de las equaciones"
+  wrongPassword:
+    English = "Wrong password"
+    Spanish = "Contraseña incorrecta"
