@@ -1,7 +1,7 @@
 # Parabola
 A static projectile motion simulator and calculator website built with Nim.
 
-![image](https://github.com/user-attachments/assets/8888a276-4ceb-478a-bd7c-572e0d2770c8)
+![image](https://github.com/user-attachments/assets/5e100882-063b-4d7f-866e-f249d587f7e5)
 
 It uses [matter-js](https://github.com/liabru/matter-js/) for the physics engine, [KaTex](https://github.com/KaTeX/KaTeX) to render the math equations, [Karax](https://github.com/karaxnim/karax/) as a frontend framework, [Sass](https://sass-lang.com/), [Spectre.css](https://github.com/picturepan2/spectre) as a CSS framework and [ni18n](https://github.com/heinthanth/ni18n) to manage translations (internationalization).
 
