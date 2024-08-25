@@ -50,7 +50,7 @@ i18nInit Locale, true:
     Spanish = "Tiempo de vuelo"
   maxRange:
     English = "Max range"
-    Spanish = "Rango máximo"
+    Spanish = "Alcance máximo"
   height:
     English = "Height"
     Spanish = "Altura"

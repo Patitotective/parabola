@@ -5,7 +5,7 @@ import src/config as _
 
 version       = config.version
 author        = "Patitotective"
-description   = "A projectile motion simulator website (only html)"
+description   = "A static projectile motion simulator website"
 license       = "MIT"
 srcDir        = "src"
 skipExt       = @["nim"]
