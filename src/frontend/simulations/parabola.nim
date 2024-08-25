@@ -716,17 +716,18 @@ proc calcTrajectory(state: var ParabolaState) =
   let prevLastPoint = state.trajectory.pinnedPoint != 0 and 
     state.trajectory.pinnedPoint in state.trajectory.points and 
     state.trajectory.points.high == state.trajectory.pinnedPoint
+  let totalTime = initialState.calcTotalTime()
 
   var highest = (index: 0, y: 0.0)
 
   state.trajectory.points.setLen(0)
-  for t in countthrough(0.0, initialState.calcTotalTime(), step = delta / 25):
+  for t in countthrough(0.0, totalTime / 2, totalTime, step = delta / 25):
     var point: TrajectoryPoint
     with point:
       time = t.round(state.floatPrecision)
       pos = initialState.calcPos(point.time)
-      vel = initialState.calcVel(point.time)
-      speed = point.vel.magnitude()
+      vel = initialState.calcVel(point.time)#.both proc(a: float): float = abs(a)
+      speed = point.vel.magnitude()        
 
     state.trajectory.points.add point
 
@@ -1039,7 +1040,7 @@ proc onAfterUpdate(state: var ParabolaState, event: JsObject) =
       if not b.isSleeping.to(bool) and not b.isStatic.to(bool):
         freeze = false
 
-        if b.speed.to(float) > 1000:
+        if b.speed.to(float) > 1500:
           Matter.Body.setSpeed(b, 10)
 
     #echo (f: freeze, a: not state.canon.base.dragging, b: not state.canon.dragging, 
@@ -1822,8 +1823,8 @@ proc reload*(state: var ParabolaState) =
 proc renderLeftDiv(state: var ParabolaState): VNode =
   buildHtml tdiv(id = "sim", class = "column col-8", style = "height: 100%".toCss):
     # tabindex makes it able to focus the canvas 
-    canvas(id = "canvas", style = toCss "height: 100%; width: 100%; min-width: 500px;" &
-      "min-height: 300px; outline: none", tabindex = "0"):
+    canvas(id = "canvas", style = toCss "height: 100%; width: 100%; min-width: 230px;" &
+      "outline: none", tabindex = "0"):
       text "Matter-js simulation"
       proc onclick(e: Event, n: VNode) = 
         n.dom.focus()
