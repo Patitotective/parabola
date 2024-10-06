@@ -538,30 +538,30 @@ proc updateStateAccordion(state: var ParabolaState) =
   getElementById("state-input-g").value = cstring state.strfloat(siInitialState.gravity.y)
 
   let changes = {
-    "#vix > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+    "#vox > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       block:
-        toggleFormulaProc("vix", state.showFormulaProc)
+        toggleFormulaProc("vox", state.showFormulaProc)
         if state.showFormulaResults:
           &"{state.strfloat(siInitialState.vel.x)}m/s"
         else: hiddenFormulaVal,
-    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
+    "#vox > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.speed)}m/s",
-    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(4) > span:nth-child(1)":
+    "#vox > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(4) > span:nth-child(1)":
       &"{siInitialState.angleDeg:.0f}°",
-    "#vix > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+    "#vox > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.x)}m/s",    
 
-    "#viy > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+    "#voy > label:nth-child(2) > span:nth-child(2) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       block:
-        toggleFormulaProc("viy", state.showFormulaProc)
+        toggleFormulaProc("voy", state.showFormulaProc)
         if state.showFormulaResults:
           &"{state.strfloat(siInitialState.vel.y)}m/s"
         else: hiddenFormulaVal,
-    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
+    "#voy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(2) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.speed)}m/s",
-    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(4) > span:nth-child(1)":
+    "#voy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(3) > span:nth-child(4) > span:nth-child(1)":
       &"{siInitialState.angleDeg:.0f}°",
-    "#viy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
+    "#voy > div:nth-child(3) > ul:nth-child(1) > li:nth-child(1) > span:nth-child(1) > span:nth-child(1) > span:nth-child(2) > span:nth-child(4) > span:nth-child(2)":
       &"{state.strfloat(siInitialState.vel.y)}m/s",    
   }
   
@@ -1850,7 +1850,7 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
         `data-tooltip` = cstring state.lang.maxHeight, 
         `disabled-data-tooltip` = cstring state.lang.disabledMaxHeight):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(h_{max} = h + \dfrac{v_{iy}^{2}}{2g} = d\)"
+        text r"\(h_{max} = h + \dfrac{v_{oy}^{2}}{2g} = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
@@ -1867,7 +1867,7 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
       label(id = "l_f-2", class = "accordion-header tooltip", `for` = "accordion-f-2", 
         `data-tooltip` = cstring state.lang.timeOfFlight):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(t_{f} = \dfrac{v_{iy}\:+\:\sqrt{v_{iy}^{2}\:+\:2gh}}{g} = d\)"
+        text r"\(t_{f} = \dfrac{v_{oy}\:+\:\sqrt{v_{oy}^{2}\:+\:2gh}}{g} = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
@@ -1890,7 +1890,7 @@ proc renderFormulasAccordion(state: var ParabolaState): VNode =
       label(id = "l_f-3", class = "accordion-header tooltip", `for` = "accordion-f-3", 
         `data-tooltip` = cstring state.lang.maxRange):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(x_{max} = v_{ix}\:\cdot\:t_f = d\)"
+        text r"\(x_{max} = v_{ox}\:\cdot\:t_f = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(id = "maxRange", style = "list-style-type: none;".toCss):
@@ -1940,7 +1940,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
   buildHtml form(class = "form-horizontal"):
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "state-input-h"): text state.lang.height
+        label(class = "form-label", `for` = "state-input-h"): text state.lang.height & " (m)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-h", 
           step = cstring state.inputStep):
@@ -1962,7 +1962,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "state-input-a"): text state.lang.angle
+        label(class = "form-label", `for` = "state-input-a"): text state.lang.angle & " (°)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-a", 
           step = "1"):
@@ -1985,7 +1985,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "state-input-s"): text state.lang.speed
+        label(class = "form-label", `for` = "state-input-s"): text state.lang.speed & " (m/s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-s", 
           step = cstring state.inputStep):
@@ -2007,14 +2007,14 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "state-input-vx"): text state.lang.vx
+        label(class = "form-label", `for` = "state-input-vx"): text state.lang.vx & " (m/s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-vx", 
           readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "state-input-vy"): text state.lang.vy
+        label(class = "form-label", `for` = "state-input-vy"): text state.lang.vy & " (m/s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "state-input-vy", 
           readonly = true)
@@ -2031,7 +2031,7 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
             # We do not use `for` = "state-input-g" here because we want the click
             # to show the planets' gravities
             label(class = "form-label"):
-              text state.lang.gravity
+              text state.lang.gravity & " (m/s²)"
               proc onclick() = 
                 let ele = getElementById("accordion-g")
                 ele.checked = not ele.checked
@@ -2064,35 +2064,33 @@ proc renderStateAccordion(state: var ParabolaState): VNode =
     # To disable form submit on enter https://stackoverflow.com/questions/895171/prevent-users-from-submitting-a-form-by-hitting-enter#comment93893498_51507806
     input(`type` = "submit", disabled = true, style = "display: none;".toCss, `aria-hidden` = true)
 
-    tdiv(id = "vix", class = "accordion"):
+    tdiv(id = "vox", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f--1", hidden = true, checked = false)
       label(class = "accordion-header tooltip", `for` = "accordion-f--1", 
-        `data-tooltip` = cstring state.lang.vix, style = "padding: 0 0 0.6rem;".toCss):
+        `data-tooltip` = cstring state.lang.vox, style = "padding: 0 0 0.6rem;".toCss):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(v_{ix} = v\:\cdot\:\cos{\alpha} = d\)"
+        text r"\(v_{ox} = v\:\cdot\:\cos{\alpha} = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
           li(): 
-            text r"\(v_{ix} = v\:\cdot\:\cos{a} = d\)"
+            text r"\(v_{ox} = v\:\cdot\:\cos{a} = d\)"
     
-    tdiv(id = "viy", class = "accordion"):
+    tdiv(id = "voy", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-f-0", hidden = true, checked = false)
       label(class = "accordion-header tooltip", `for` = "accordion-f-0", 
-        `data-tooltip` = cstring state.lang.viy, style = "padding: 0 0 0.6rem;".toCss):
+        `data-tooltip` = cstring state.lang.voy, style = "padding: 0 0 0.6rem;".toCss):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(v_{iy} = v\:\cdot\:\sin{\alpha} = d\)"
+        text r"\(v_{oy} = v\:\cdot\:\sin{\alpha} = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
           li(): 
-            text r"\(v_{iy} = v\:\cdot\:\sin{a} = d\)"
+            text r"\(v_{oy} = v\:\cdot\:\sin{a} = d\)"
 
 proc renderPointAccordion(state: var ParabolaState): VNode =
-  #let (show, point) = state.currentPoint()
-
   let liStyle = "margin-top: 20px;".toCss
 
   proc changeXTo(x: float) = 
@@ -2230,7 +2228,7 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
   buildHtml form(class = "form-horizontal"):
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "point-input-x"): text state.lang.x
+        label(class = "form-label", `for` = "point-input-x"): text state.lang.x & " (m)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-x", 
           step = cstring state.inputStep):
@@ -2252,14 +2250,14 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "point-input-y"): text state.lang.y
+        label(class = "form-label", `for` = "point-input-y"): text state.lang.y & " (m)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-y", 
           step = cstring state.inputStep, onchange = onInputYChange, readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "point-input-y"): text state.lang.t
+        label(class = "form-label", `for` = "point-input-y"): text state.lang.t & " (s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-t", 
           step = cstring state.inputStep):
@@ -2281,26 +2279,26 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "point-input-vx"): text state.lang.vx
+        label(class = "form-label", `for` = "point-input-vx"): text state.lang.vx & " (m/s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-vx", 
           readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "point-input-vy"): text state.lang.vy
+        label(class = "form-label", `for` = "point-input-vy"): text state.lang.vy & " (m/s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-vy", 
           readonly = true)
 
     tdiv(class = "form-group"): 
       tdiv(class = "col-3 col-sm-12"):
-        label(class = "form-label", `for` = "point-input-s"): text state.lang.speed
+        label(class = "form-label", `for` = "point-input-s"): text state.lang.speed & " (m/s)"
       tdiv(class = "col-9 col-sm-12"):
         input(class = "form-input form-inline", `type` = "number", id = "point-input-s", 
           readonly = true)
 
-    tdiv(class = "form-group"): 
+    tdiv(class = "form-group tooltip", `data-tooltip` = cstring state.lang.followBulletHelp): 
       label(class = "form-switch"):
         input(`type` = "checkbox", id = "point-input-f", 
           checked = false):
@@ -2356,7 +2354,7 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
 
     label(id = "vx", class = "accordion-header tooltip", `data-tooltip` = cstring state.lang.vx, 
       style = toCss "margin-bottom: 0.6rem; margin-left: 1rem;"):
-      text r"\(v_{x} = v_{xy} = d\)"
+      text r"\(v_{x} = v_{ox} = d\)"
 
     tdiv(id = "vy", class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
@@ -2364,7 +2362,7 @@ proc renderPointAccordion(state: var ParabolaState): VNode =
       label(class = "accordion-header tooltip", `for` = "accordion-f-vy", 
         `data-tooltip` = cstring state.lang.vy, `disabled-data-tooltip` = cstring state.lang.noPoint):
         italic(class = "icon icon-arrow-right mr-1")
-        text r"\(v_{y} = v_{iy}\:-\:g\:\cdot\:t = d\)"
+        text r"\(v_{y} = v_{oy}\:-\:g\:\cdot\:t = d\)"
 
       tdiv(class = "accordion-body", style = formulaAccordionBodyStyle):
         ul(style = "list-style-type: none;".toCss):
@@ -2520,7 +2518,7 @@ proc renderTeacherModeModal(state: var ParabolaState): VNode =
                 let inputHint = getElementById("teacher-modal-input-hint")
                 inputHint.style.setProperty("visibility", "visible")
                 inputHint.innerText = 
-                  state.lang.wrongPassword
+                  cstring state.lang.wrongPassword
 
               getElementById("teacher-modal-content").classList.add("has-error")
 
@@ -2921,9 +2919,13 @@ proc renderRightDiv(state: var ParabolaState): VNode =
     tdiv(class = "accordion"):
       input(`type` = "checkbox", name  = "accordion-checkbox", 
         id = "accordion-2", hidden = true, checked = true)
-      label(class = "accordion-header", `for` = "accordion-2"):
+      label(class = "accordion-header", style = toCss "display: inline-flex", `for` = "accordion-2"):
         italic(class = "icon icon-arrow-right mr-1")
         text state.lang.point
+
+        tdiv(class = "tooltip", `data-tooltip` = cstring state.lang.pointHelp):
+          span(class = "material-symbols-outlined"): text "info"
+      
       tdiv(class = "accordion-body", style = "padding-left: 2em;".toCss):
         state.renderPointAccordion()
 
@@ -2984,3 +2986,4 @@ proc addEventListeners*(state: var ParabolaState) =
     of "d":
       discard "debug"
   )
+

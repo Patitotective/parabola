@@ -32,11 +32,10 @@ i18nInit Locale, true:
   jupiter:
     English = "Jupiter"
     Spanish = "Júpiter"
-
-  vix:
+  vox:
     English = "Initial X vel"
     Spanish = "Vel inicial en X"
-  viy:
+  voy:
     English = "Initial Y vel"
     Spanish = "Vel inicial en Y"
   maxHeight:
@@ -81,6 +80,9 @@ i18nInit Locale, true:
   followBullet:
     English = "Follow bullet"
     Spanish = "Seguir la bala"
+  followBulletHelp:
+    English = "The selected trajectory point will be equal\nto the bullet's position in real time."
+    Spanish = "El punto de la trayectoria seleccionado será\nigual a la posición de la bala en tiempo real."
   noPoint:
     English = "Select a trajectory point"
     Spanish = "Selecciona un punto de la trayectoria"
@@ -98,7 +100,7 @@ i18nInit Locale, true:
     Spanish = "Trayectorias"
   trajTooltip:
     English = "Double-click a trajectory to delete it"
-    Spanish = "Da doble clic sobre una trajectoria\npara eliminarla"
+    Spanish = "Da doble clic sobre una trayectoria\npara eliminarla"
   iniState:
     English = "Initial State"
     Spanish = "Estado Inicial"
@@ -107,7 +109,7 @@ i18nInit Locale, true:
     Spanish = "Punto de la trayectoria"
   formulas:
     English = "Equations"
-    Spanish = "Equaciones"
+    Spanish = "Ecuaciones"
   showVxArrow:
     English = "Show X velocity arrow"
     Spanish = "Mostrar la flecha de velocidad en X"
@@ -125,7 +127,7 @@ i18nInit Locale, true:
     Spanish = "Mostrar los resultados de las equaciones"
   #hiddenFormula:
   #  English = "To show the results, check the settings"
-  #  Spanish = "Para mostrar los resulados, \nabre la configuración"
+  #  Spanish = "Para mostrar los resultados, \nabre la configuración"
   starsAnimation:
     English = "Animate background stars"
     Spanish = "Animar las estrellas de fondo"
@@ -140,21 +142,21 @@ i18nInit Locale, true:
     Spanish = "Ayuda"
   help1:
     English = "You can change the initial angle of the canon by dragging the canon or by pressing the right and left keys."
-    Spanish = "Puedes cambiar el ángulo inicial del cañón arrastrando el cañon o presionando las flechas de derecha y izquierda."
+    Spanish = "Puedes cambiar el ángulo inicial del cañón arrastrando el cañón o presionando las flechas de derecha y izquierda."
   help2:
     English = "You can move the canon in the Y axis by dragging the base of the canon or the platform below the canon."
     Spanish = "Puedes mover el cañón en el eje Y arrastrando la base del cañón o la plataforma debajo del cañón."
   help3:
-    English = "You can change the inital speed of the canon by moving the wheel on your mouse, by dragging with two fingers in your touchpad or by pressing the up and down keys."
-    Spanish = "Puiedes cambiar la rapidez inicial del cañón moviendo la rueda del mouse, arrastrando con dos dedos en el touchpad o presionando las flechas de arriba y abajo."
+    English = "You can change the initial speed of the canon by moving the wheel on your mouse, by dragging with two fingers in your touch-pad or by pressing the up and down keys."
+    Spanish = "Puedes cambiar la rapidez inicial del cañón moviendo la rueda del mouse, arrastrando con dos dedos en el touchpad o presionando las flechas de arriba y abajo."
   help4:
     English = "You can select any point in the trajectory by double-clicking and dragging the mouse, you can remove this point by double-clicking far from the trajectory."
     Spanish = "Puedes seleccionar cualquier punto en la trayectoria dando doble clic y arrastrando el mouse, puedes quitar este punto dando doble clic lejos de la trayectoria."
   help5:
     English = "You can pause the simulation by pressing the key P."
-    Spanish = "Puedes pausar la simulación presionand la tecla P."
+    Spanish = "Puedes pausar la simulación presionando la tecla P."
   help6:
-    English = "You can fire a bullet by pressing the wheel on your mouse, pressing with three fingers in your touchpad or by pressing the spacebar."
+    English = "You can fire a bullet by pressing the wheel on your mouse, pressing with three fingers in your touchpad or by pressing the space-bar."
     Spanish = "Puedes disparar una bala presionando la rueda del mouse, presionando con tres dedos en el touchpad o presionando la barra espaciadora."
   help7:
     English = "You can add a new trajectory by pressing the enter key and you can remove a trajectory by double-clicking its button."
@@ -199,7 +201,7 @@ i18nInit Locale, true:
     Spanish = "En el Modo Estudiante no vas a poder cambiar la configuración. Para volver al Modo Profesor necesitarás la contraseña que vas a ingresar ahora:"
   studentModeExplaination2:
     English = "This is useful if you don't want your students to see the solutions or the procedures for the equations if you lend them your computer."
-    Spanish = "Esto es útil si no quieres que tus estudiantes vean las soluciones o los procedimientos de las equaciones si les prestas tu computador."
+    Spanish = "Esto es útil si no quieres que tus estudiantes vean las soluciones o los procedimientos de las ecuaciones si les prestas tu computador."
   collideWithBlocks:
     English = "Collide with blocks in flight"
     Spanish = "Colisionar con los bloques en vuelo"
@@ -211,16 +213,19 @@ i18nInit Locale, true:
     Spanish = "Contraseña"
   tooShortPassword:
     English = "The password is too short"
-    Spanish = "La constraseña es muy corta"
+    Spanish = "La contraseña es muy corta"
   tooLongPassword:
     English = "The password is too long"
-    Spanish = "La constraseña es muy larga"
+    Spanish = "La contraseña es muy larga"
   teacherModeExplaination:
     English = "To switch back to Teacher Mode you will have to enter the password that was set when switching to Student Mode."
     Spanish = "Para volver al Modo Profesor necesitas ingresar la contraseña que fue ingresada cuando se cambió al Modo Estudiante."
   showFormulaProc:
     English = "Show equations' procedures"
-    Spanish = "Mostar los procedimientos de las equaciones"
+    Spanish = "Mostrar los procedimientos de las ecuaciones"
   wrongPassword:
     English = "Wrong password"
     Spanish = "Contraseña incorrecta"
+  pointHelp:
+    English = "Double-click the trajectory to select a point\nand hold the mouse down to drag the point."
+    Spanish = "Da doble clic en la trayectoria para seleccionar\nun punto y manten el mouse oprimido para\narrastrar el punto."
