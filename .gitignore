@@ -4,3 +4,5 @@ htmldocs/
 dist*
 src/buildcss
 app
+public/js/frontend.js
+public/favicon.png

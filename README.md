@@ -39,9 +39,8 @@ You will now have a `dist` folder containing everything necessary for this stati
 
 ## Post Processing
 These tools can be used in the final files to shrink the file size and provide backward compatibility with older Javascript:
-1. Babel Formatter with https://codifyformatter.org/babel-formatter.
-2. JS Minifier with https://www.toptal.com/developers/javascript-minifier.
-3. HTML Minfier with https://codebeautify.org/minify-html
+1. JS Minifier with [terser](https://terser.org/).
+2. HTML Minfier with https://codebeautify.org/minify-html.
 
 ## About
 - GitHub: https://github.com/Patitotective/parabola.
