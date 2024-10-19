@@ -2,6 +2,8 @@
 A static projectile motion simulator and calculator website built with Nim.
 It uses [matter-js](https://github.com/liabru/matter-js/) for the physics engine, [KaTex](https://github.com/KaTeX/KaTeX) to render the math equations, [Karax](https://github.com/karaxnim/karax/) as a frontend framework, [Sass](https://sass-lang.com/), [Spectre.css](https://github.com/picturepan2/spectre) as a CSS framework and [ni18n](https://github.com/heinthanth/ni18n) to manage translations (internationalization).
 
+![image](https://github.com/user-attachments/assets/ee3daed1-9c4d-47ed-964d-e970af2fb02f)
+
 ## Features
 - Includes the real-time equations with the procedures for the time of flight, maximum height, maximum range, velocity components and the position and velocity of any point in the trajectory.
 - You can change the initial speed, height and angle of the canon, as well as the gravity of the simulation.
